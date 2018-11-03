@@ -200,13 +200,12 @@ class Thunderball(GEScenario):
         return True
 
     def CalculateCustomDamage(self, victim, info, health, armor):
-        killer = GEPlayer.ToMPPlayer(info.GetAttacker())
-
-        # If being attacked reduce damage by 20% (i think)
-        if killer is not None:
-            armor -= armor * 0.2
-            health -= health * 0.2
-
+        if victim.GetUID() == Thunderball.THUNDERBALL_OWNER:
+            killer = GEPlayer.ToMPPlayer(info.GetAttacker())
+            # If being attacked reduce damage by 20% (i think)
+            if killer is not None:
+                armor -= armor * 0.2
+                health -= health * 0.2
         return health, armor
 
     def chooserandom(self):
