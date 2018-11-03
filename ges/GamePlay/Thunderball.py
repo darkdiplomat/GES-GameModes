@@ -1,9 +1,26 @@
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Thunderball
-# Alpha 1.0
+# Beta v1.0
 # By: DarkDiplomat
 #
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Based loosely on concepts layout at https://forums.geshl2.com/index.php/topic,5573.0.html
+#
+# Synopsis: The Thunderball is set to explode every 25 seconds!
+# At the start of a round, the Thunderball is given to a random
+# player. The player has to kill an opponent to get rid of the
+# Thunderball. If the player is unable to accomplish that they
+# are eliminated from the round and the last player to kill them takes ownership
+# of the Thunderball; if no last killer, a new random player is selected.
+# At the end of the round, the last player standing is awarded double
+# their round points. Scoring is deathmatch style, all kills gain points.
+# The Thunderball carrier gets some advantages to help them transfer the
+# Thunderball, such as, increased speed and taking less damage (like an
+# adrenaline boost in the panic of being the Thunderball carrier)
+#
+# Note: Sometimes when a new round starts the timer has already started running
+# before the player gains control. This doesn't appear to be something correctable
+# in the script unfortunately
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 from . import GEScenario
 from .Utils import _
@@ -19,6 +36,7 @@ TR_ELIMINATED = "eliminated"
 TR_SPAWNED = "spawned"
 ALERT_COLOR = GEUtil.Color(139, 0, 0, 230)
 RELIEF_COLOR = GEUtil.Color(170, 170, 170, 230)
+DETONATE_TIME = 25
 
 
 class Thunderball(GEScenario):
@@ -37,8 +55,8 @@ class Thunderball(GEScenario):
                 Thunderball.THUNDERBALL_OWNER = None  # This will be reset later
                 Thunderball.PLTRACKER[player][TR_ELIMINATED] = True
                 if not player.IsDead():
-                    # explode, force
-                    player.CommitSuicide(True, True)
+                    player.AddRoundScore(1)  # Give them an extra point to make up for the loss on forced suicide
+                    player.CommitSuicide(True, True)  # undocumented args: explode, force  (not sure what they do)
                 player.SetScoreBoardColor(Glb.SB_COLOR_ELIMINATED)
                 GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", player.GetCleanPlayerName()))
                 GEUtil.PopupMessage(player, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
@@ -63,11 +81,16 @@ class Thunderball(GEScenario):
         return Glb.TEAMPLAY_NONE
 
     def GetScenarioHelp(self, help_obj):
-        help_obj.SetDescription("The Thunderball is set to explode every 20 seconds! Pass the Thunderball off by"
-                                "killing another player before it explodes in your pocket! If you have the"
-                                "Thunderball you get increased speed and take reduced damage to help you pass it off. "
-                                "Scoring is like regular death match. Be the last man standing to gain the most points "
-                                "(and a bonus doubling of your round points!)")
+        help_obj.SetDescription("The Thunderball is set to explode every 25 seconds!"
+                                " At the start of a round, the Thunderball is given to a random player. "
+                                "The player has to kill an opponent to get rid of the Thunderball. "
+                                "If the player is unable to accomplish that they are eliminated from the round "
+                                "and the last player to kill them takes the Thunderball; if no last killer, "
+                                "a new random player is selected. At the end of the round, the last player "
+                                "standing is awarded double their round points. Scoring is deathmatch style, all kills "
+                                "gain points. The Thunderball carrier gets some advantages to help them transfer the "
+                                "Thunderball, such as, increased speed and taking less damage (like an adrenaline "
+                                "boost in the panic of being the Thunderball carrier)")
 
     def OnLoadGamePlay( self ):
         # Ensure our sounds are pre-cached
@@ -114,7 +137,7 @@ class Thunderball(GEScenario):
                 if self.thunderballTimer.state == Timer.STATE_PAUSE:
                     self.thunderballTimer.Start()
                 else:
-                    self.thunderballTimer.Start(20, True)
+                    self.thunderballTimer.Start(DETONATE_TIME, True)
             if player.IsInitialSpawn() and not self.isinplay(player):
                 GEUtil.PopupMessage(player, "#GES_GPH_CANTJOIN_TITLE", "#GES_GPH_CANTJOIN")
 
@@ -153,7 +176,7 @@ class Thunderball(GEScenario):
 
         if self.warmupTimer.HadWarmup() and not self.waitingForPlayers and Thunderball.ASSIGNED_ONCE:
             if Thunderball.THUNDERBALL_OWNER is None:
-                if Thunderball.LAST_AGGRESSOR:  # Pass Thunderball to last Aggressor
+                if Thunderball.LAST_AGGRESSOR is not None:  # Pass Thunderball to last Aggressor
                     aggressor = GEPlayer.ToMPPlayer(Thunderball.LAST_AGGRESSOR)
                     Thunderball.LAST_AGGRESSOR = None
                     if not Thunderball.PLTRACKER[aggressor][TR_ELIMINATED]:
@@ -162,19 +185,12 @@ class Thunderball(GEScenario):
                         self.assignThunderball(self.chooserandom())
                 else:
                     self.assignThunderball(self.chooserandom())
-            remain = 20 - int(self.thunderballTimer.GetCurrentTime())
-            GEUtil.HudMessage(None, "Thunderball Detonation in %0.0f sec" % remain, -1, -2.75, ALERT_COLOR, 1.0, 5)
+            remain = DETONATE_TIME - int(self.thunderballTimer.GetCurrentTime())
+            GEUtil.HudMessage(None, "Thunderball Detonation in %0.0f sec" % remain, -1, 0.12, ALERT_COLOR, 1.0, 5)
             if remain == 6:  # it takes a moment to play the sound
                 owner = GEPlayer.ToMPPlayer(Thunderball.THUNDERBALL_OWNER)
                 GEUtil.PlaySoundToPlayer(owner, "GEGamePlay.Level_Down")
-            # Sometimes you have to give the timer a kick in the ass
-            if Thunderball.THUNDERBALL_OWNER is not None:
-                if self.thunderballTimer.state == Timer.STATE_STOP \
-                        and not GEPlayer.ToMPPlayer(Thunderball.THUNDERBALL_OWNER).IsDead():
-                    self.thunderballTimer.Start(20, True)
-                elif self.thunderballTimer.state == Timer.STATE_PAUSE \
-                        and not GEPlayer.ToMPPlayer(Thunderball.THUNDERBALL_OWNER).IsDead():
-                    self.thunderballTimer.Start()
+            self.countplayers()
 
     def OnPlayerKilled(self, victim, killer, weapon):
         # Let the base scenario behavior handle scoring so we can just worry about the thunderball mechanics.
@@ -217,7 +233,6 @@ class Thunderball(GEScenario):
                 iplayers.append(player)
 
         numplayers = len(iplayers)
-
         if numplayers == 0 and Thunderball.ASSIGNED_ONCE:
             # This shouldn't happen, but just in case it does we don't want to overflow the vector...
             GERules.EndRound()
@@ -246,6 +261,26 @@ class Thunderball(GEScenario):
             GEUtil.HudMessage(oldowner, "You have passed the Thunderball!", -1, 0.75, RELIEF_COLOR, 5.0)
             oldowner.SetSpeedMultiplier(1.0)
             Thunderball.LAST_AGGRESSOR = oldowner.GetUID()
+
+    def countplayers(self):
+        # Check to see if more than one player is around
+        iplayers = []
+
+        for player in Thunderball.PLTRACKER.GetPlayers():
+            if self.isinplay(player):
+                iplayers.append(player)
+
+        numplayers = len(iplayers)
+        if numplayers == 0 and Thunderball.ASSIGNED_ONCE:
+            # This shouldn't happen, but just in case it does we don't want to overflow the vector...
+            GERules.EndRound()
+            return None
+        elif numplayers == 1 and Thunderball.ASSIGNED_ONCE:
+            # Make last remaining player the winner, and double his or her score.
+            GERules.SetPlayerWinner(iplayers[0])
+            iplayers[0].IncrementScore(iplayers[0].GetScore())
+            GERules.EndRound()
+            return None
 
     @staticmethod
     def isinplay(player):
