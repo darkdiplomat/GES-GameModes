@@ -276,7 +276,6 @@ class ForYourEyesOnly(GEScenario):
         if self.warmupTimer.IsInWarmup():
             return
 
-        self.InitializePlayerBounty()
         # Check to see if more than one player is around
         iPlayers = []
 
