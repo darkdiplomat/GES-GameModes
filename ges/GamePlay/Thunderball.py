@@ -209,7 +209,7 @@ class Thunderball(GEScenario):
             if remain == 6:  # it takes a moment to play the sound
                 owner = GEPlayer.ToMPPlayer(Thunderball.THUNDERBALL_OWNER)
                 GEUtil.PlaySoundToPlayer(owner, "GEGamePlay.Level_Down")
-            self.countplayers()
+            self.chooserandom()  # this works to end the round
 
     def OnPlayerKilled(self, victim, killer, weapon):
         # Let the base scenario behavior handle scoring so we can just worry about the thunderball mechanics.
@@ -259,9 +259,6 @@ class Thunderball(GEScenario):
             GERules.EndRound()
             return None
         elif numplayers == 1 and Thunderball.ASSIGNED_ONCE:
-            # Make last remaining player the winner, and double his or her score.
-            GERules.SetPlayerWinner(iplayers[0])
-            iplayers[0].IncrementScore(iplayers[0].GetScore())
             GERules.EndRound()
             return None
         else:
@@ -286,24 +283,6 @@ class Thunderball(GEScenario):
             GEUtil.HudMessage(oldowner, "You have passed the Thunderball!", -1, 0.75, RELIEF_COLOR, 5.0)
             oldowner.SetSpeedMultiplier(1.0)
             Thunderball.LAST_AGGRESSOR = oldowner.GetUID()
-
-    def countplayers(self):
-        # Check to see if more than one player is around
-        iplayers = []
-
-        for player in Thunderball.PLTRACKER.GetPlayers():
-            if self.isinplay(player):
-                iplayers.append(player)
-
-        numplayers = len(iplayers)
-        # This shouldn't happen, but just in case it does we don't want to overflow the vector...
-        if numplayers == 0 and Thunderball.ASSIGNED_ONCE:
-            GERules.EndRound()
-            return None
-        # Only 1 player left standing!
-        elif numplayers == 1 and Thunderball.ASSIGNED_ONCE:
-            GERules.EndRound()
-            return None
 
     @staticmethod
     def isinplay(player):
