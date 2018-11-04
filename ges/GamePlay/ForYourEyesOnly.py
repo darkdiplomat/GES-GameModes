@@ -85,6 +85,7 @@ class ForYourEyesOnly(GEScenario):
                                                print_name="Briefcase")
         GEMPGameRules.GetRadar().SetForceRadar(True)
         # self.LoadConfig()
+        self.warmupTimer.Reset()
 
         # Precache all necessary sounds
         GEUtil.PrecacheSound("GEGamePlay.Token_Chime")
@@ -105,6 +106,7 @@ class ForYourEyesOnly(GEScenario):
         super(ForYourEyesOnly, self).OnUnloadGamePlay()
         self.warmupTimer = None
         self.pltracker = None
+        self.warmupTimer.Reset()
 
     def OnPlayerConnect(self, player):
         self.pltracker[player][self.TR_SPAWNED] = False
@@ -170,7 +172,7 @@ class ForYourEyesOnly(GEScenario):
         if not self.waitingForPlayers and killer.GetUID == self.CaseOwnerID:
             GEMPGameRules.LockRound()
             GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", victim.GetCleanPlayerName()))
-            GEUtil.EmitGameplayEvent("fyeo_eliminated", str(victim.GetUID), str(killer.GetUID if killer else ""),
+            GEUtil.EmitGameplayEvent("fyeo_eliminated", str(victim.GetUID()), str(killer.GetUID() if killer else ""),
                                      "", "", True)
             GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
             GEUtil.PlaySoundToPlayer(killer, "GEGamePlay.Token_Chime")
