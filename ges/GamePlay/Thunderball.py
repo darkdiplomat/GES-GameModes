@@ -69,7 +69,7 @@ class Thunderball(GEScenario):
                 for player in Thunderball.PLTRACKER.GetPlayers():
                     if Thunderball.isinplay(player):
                         player.AddRoundScore(1)
-                        GEUtil.HudMessage(player, "Have a point for surviving!", -1, 0.70, SURVIVE_COLOR, 5.0)
+                        GEUtil.HudMessage(player, "Have a point for not blowing up!", -1, 0.71, SURVIVE_COLOR, 5.0, 8)
 
     def __init__(self):
         super(Thunderball, self).__init__()
@@ -131,15 +131,16 @@ class Thunderball(GEScenario):
         if GERules.IsRoundLocked():
             Thunderball.PLTRACKER[player][TR_ELIMINATED] = True
 
-    def OnPlayerTeamChange(self, player, oldTeam, newTeam):
+    def CanPlayerChangeTeam( self, player, oldteam, newteam, wasforced ):
         if GERules.IsRoundLocked():
-            if oldTeam == Glb.TEAM_SPECTATOR:
+            if oldteam == Glb.TEAM_SPECTATOR:
                 GEUtil.PopupMessage(player, "#GES_GPH_CANTJOIN_TITLE", "#GES_GPH_CANTJOIN")
             else:
                 GEUtil.PopupMessage(player, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
 
             # Changing teams will automatically eliminate you
             Thunderball.PLTRACKER[player][self.TR_ELIMINATED] = True
+        return True
 
     def OnPlayerSpawn(self, player):
         if player.GetTeamNumber() != Glb.TEAM_SPECTATOR:
@@ -271,7 +272,7 @@ class Thunderball(GEScenario):
 
         Thunderball.THUNDERBALL_OWNER = newowner.GetUID()
         GEUtil.PlaySoundToPlayer(newowner, "GEGamePlay.Woosh")
-        GEUtil.HudMessage(newowner, "You have been given Thunderball!", -1, 0.75, ALERT_COLOR, 5.0)
+        GEUtil.HudMessage(newowner, "You have been given Thunderball!", -1, 0.75, ALERT_COLOR, 5.0, 6)
         newowner.SetSpeedMultiplier(1.25)
         Thunderball.ASSIGNED_ONCE = True
         if self.thunderballTimer.state == Timer.STATE_PAUSE:
@@ -280,7 +281,7 @@ class Thunderball(GEScenario):
             self.thunderballTimer.Start(DETONATE_TIME, True)
         if oldowner is not None:
             GEUtil.PlaySoundToPlayer(oldowner, "GEGamePlay.Woosh")
-            GEUtil.HudMessage(oldowner, "You have passed the Thunderball!", -1, 0.75, RELIEF_COLOR, 5.0)
+            GEUtil.HudMessage(oldowner, "You have passed the Thunderball!", -1, 0.73, RELIEF_COLOR, 5.0, 7)
             oldowner.SetSpeedMultiplier(1.0)
             Thunderball.LAST_AGGRESSOR = oldowner.GetUID()
 
