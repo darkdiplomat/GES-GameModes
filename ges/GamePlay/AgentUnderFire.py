@@ -99,6 +99,7 @@ class AgentUnderFire( GEScenario ):
 
         # CVar Holder
         self.Adrenaline = True
+        self.leveldown = True
 
     def OnUnloadGamePlay( self ):
         super(AgentUnderFire, self).OnUnloadGamePlay()
@@ -121,9 +122,12 @@ class AgentUnderFire( GEScenario ):
         GEUtil.PrecacheSound( "GEGamePlay.Token_Drop_Friend" )
         GEUtil.PrecacheSound( "GEGamePlay.Token_Grab" )
         GEUtil.PrecacheSound( "GEGamePlay.Token_Grab_Enemy" )
+        GEUtil.PrecacheSound("GEGamePlay.Level_Up")
+        GEUtil.PrecacheSound("GEGamePlay.Level_Down")
 
         self.CreateCVar( "auf_adrenaline", "1", "Give the VIPs a usable adrenaline shot. (Use 0 to disable)" )
         self.CreateCVar( "auf_warmuptime", "20", "The warmup time in seconds. (Use 0 to disable)" )
+        self.CreateCVar("auf_leveldown", "1", "Level down the team when they kill the opposing VIP (Use 0 to disable)")
 
         GERules.SetExcludedCharacters( "bond, ourumov" )
 
@@ -146,6 +150,10 @@ class AgentUnderFire( GEScenario ):
                 self.warmupTimer.StartWarmup( val )
                 if val <= 0:
                     GERules.EndRound( False )
+        elif name == "auf_leveldown":
+            val = int(newvalue)
+            if val >= 1:
+                self.leveldown = True
 
     def OnRoundBegin( self ):
         GEScenario.OnRoundBegin( self )
@@ -292,6 +300,8 @@ class AgentUnderFire( GEScenario ):
                 if killer == self.OurumovUID:
                     GEUtil.EmitGameplayEvent( "auf_janus_level_up", "%i" % killer.GetUserID(), "%i" % victim.GetUserID() )
                     self.IncrementJanus()
+                else:
+                    self.DecrementJanus()
             elif victim == self.OurumovUID:
                 GEUtil.EmitGameplayEvent( "auf_ourumov_killed", "%i" % victim.GetUserID(), "%i" % killer.GetUserID() )
                 self.DoScoring(killer, team, 2)
@@ -300,6 +310,8 @@ class AgentUnderFire( GEScenario ):
                 if killer == self.BondUID:
                     GEUtil.EmitGameplayEvent( "auf_mi6_level_up", "%i" % killer.GetUserID(), "%i" % victim.GetUserID() )
                     self.IncrementMI6()
+                else:
+                    self.DecrementMI6()
             elif killer == self.BondUID:
                 GEUtil.EmitGameplayEvent( "auf_mi6_level_up", "%i" % killer.GetUserID(), "%i" % victim.GetUserID() )
                 self.DoScoring(killer, team, 1)
@@ -616,10 +628,31 @@ class AgentUnderFire( GEScenario ):
                 if player.GetTeamNumber() == GEGlobal.TEAM_MI6:
                     self.PrintCurLevel( player )
                     self.GivePlayerWeapons( player )
-                    GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Grab" )
+                    GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Level_Up" )
                 elif player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
                     lvl = self.MI6Level
                     GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^iMI6 ^1leveled up: ^y%s" % mi6WeaponList[lvl][1] )
+                    GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Drop_Friend" )
+
+    def DecrementMI6( self ):
+        if self.MI6Level == 0 or GERules.GetNumInRoundTeamPlayers( GEGlobal.TEAM_MI6 ) == 1:
+            return
+
+        # Decrement MI6's level
+        self.MI6Level -= 1
+
+        for player in GetPlayers():
+            if player.GetUID() == self.BondUID:
+                self.PrintCurLevel( player )
+                GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Grab" )
+            elif self.IsInPlay( player ):
+                if player.GetTeamNumber() == GEGlobal.TEAM_MI6:
+                    self.PrintCurLevel( player )
+                    self.GivePlayerWeapons( player )
+                    GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Level_Down" )
+                elif player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
+                    lvl = self.MI6Level
+                    GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^iMI6 ^1spent a level: ^y%s" % mi6WeaponList[lvl][1] )
                     GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Drop_Friend" )
 
     def IncrementJanus( self ):
@@ -637,10 +670,31 @@ class AgentUnderFire( GEScenario ):
                 if player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
                     self.PrintCurLevel( player )
                     self.GivePlayerWeapons( player )
-                    GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Grab" )
+                    GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Level_Up" )
                 elif player.GetTeamNumber() == GEGlobal.TEAM_MI6:
                     lvl = self.JanusLevel
                     GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^rJanus ^1leveled up: ^y%s" % janusWeaponList[lvl][1] )
+                    GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Drop_Friend" )
+
+    def DecrementJanus( self ):
+        if self.JanusLevel == 0 or GERules.GetNumInRoundTeamPlayers( GEGlobal.TEAM_JANUS ) == 1:
+            return
+
+        # Decrement Janus' level
+        self.JanusLevel -= 1
+
+        for player in GetPlayers():
+            if player.GetUID() == self.OurumovUID:
+                self.PrintCurLevel( player )
+                GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Grab" )
+            elif self.IsInPlay( player ):
+                if player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
+                    self.PrintCurLevel( player )
+                    self.GivePlayerWeapons( player )
+                    GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Level_Down" )
+                elif player.GetTeamNumber() == GEGlobal.TEAM_MI6:
+                    lvl = self.JanusLevel
+                    GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^rJanus ^1spent a level: ^y%s" % janusWeaponList[lvl][1] )
                     GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Drop_Friend" )
 
     def PrintCurLevel( self, player ):

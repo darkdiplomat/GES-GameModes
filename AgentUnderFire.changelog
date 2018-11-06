@@ -1,0 +1,4 @@
+Nov 2018
+- Updated for GE:S v5
+- function to remove Adrenaline HUD from the player when dead
+- added an optional level down when a team kills a VIP (as suggested by Entropy-Soldier in 2014)
