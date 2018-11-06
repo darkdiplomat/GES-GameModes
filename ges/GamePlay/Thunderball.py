@@ -273,6 +273,7 @@ class Thunderball(GEScenario):
         Thunderball.THUNDERBALL_OWNER = newowner.GetUID()
         GEUtil.PlaySoundToPlayer(newowner, "GEGamePlay.Woosh")
         GEUtil.HudMessage(newowner, "You have been given Thunderball!", -1, 0.75, ALERT_COLOR, 5.0, 6)
+        GEUtil.HudMessage(Glb.TEAM_SPECTATOR, newowner.GetCleanPlayerName() + " has the Thunderball!", -1, 0.75, ALERT_COLOR, 5.0, 8)
         newowner.SetSpeedMultiplier(1.25)
         Thunderball.ASSIGNED_ONCE = True
         if self.thunderballTimer.state == Timer.STATE_PAUSE:

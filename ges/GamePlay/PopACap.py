@@ -30,6 +30,9 @@ class PopACap(GEScenario):
             if survivor is None:
                 return
             GEUtil.HudMessage(survivor, "Have a point for living!", -1, 0.75, SURVIVE_COLOR, 5.0)
+            PopACap.notifyothers(survivor.GetCleanPlayerName() + " survived for %i seconds..." % 30)
+            GEUtil.HudMessage(Glb.TEAM_SPECTATOR, survivor.GetCleanPlayerName() + " survived for %i seconds..." % 30,
+                              -1, 0.75, SURVIVE_COLOR, 5.0)
             survivor.AddRoundScore(1)
 
     def __init__(self):
@@ -114,6 +117,9 @@ class PopACap(GEScenario):
             self.capSurviveTimer.Stop()  # Victim didn't survive
             GEUtil.HudMessage(killer, "Well Done! You Popped a Cap!", -1, 0.73, SURVIVE_COLOR, 5.0, 5)
             GEUtil.HudMessage(killer, "Have 2 points...", -1, 0.75, SURVIVE_COLOR, 5.0, 6)
+            GEUtil.HudMessage(Glb.TEAM_SPECTATOR, killer.GetCleanPlayerName() + " popped the cap!",
+                              -1, 0.75, SURVIVE_COLOR, 5.0, 8)
+            self.notifyothers(killer.GetCleanPlayerName() + " popped the cap!")
             killer.AddRoundScore(2)
             GERules.GetRadar().DropRadarContact(victim)
             victim.SetScoreBoardColor(Glb.SB_COLOR_WHITE)
@@ -137,7 +143,7 @@ class PopACap(GEScenario):
         iplayers = []
 
         for player in GetPlayers():
-            if not player.IsDead() and player.IsInRound():
+            if not player.IsDead() and player.IsInRound() and player.GetUID() != PopACap.VICTIM:
                 iplayers.append(player)
 
         numplayers = len(iplayers)
@@ -153,7 +159,15 @@ class PopACap(GEScenario):
             for player in iplayers:
                 GEUtil.HudMessage(player, "Get %s" % newvictim.GetCleanPlayerName(),
                                   -1, 0.65, GET_VICTIM_COLOR, 5.0, 7)
+            GEUtil.HudMessage(Glb.TEAM_SPECTATOR, "%s is the victim" % newvictim.GetCleanPlayerName(),
+                              -1, 0.65, GET_VICTIM_COLOR, 5.0, 7)
             self.capSurviveTimer.Start(30, True)  # TODO: Configurable timer?
             GERules.GetRadar().AddRadarContact(newvictim, Glb.RADAR_TYPE_PLAYER, True, "sprites/hud/radar/star")
             GERules.GetRadar().SetupObjective(newvictim, Glb.TEAM_NONE, "", "VICTIM", CAP_OBJECTIVE, 300)
             newvictim.SetScoreBoardColor(Glb.SB_COLOR_GOLD)
+
+    @staticmethod
+    def notifyothers(msg):
+        for player in GetPlayers():
+            if player.GetUID() != PopACap.VICTIM:
+                GEUtil.HudMessage(player, msg, -1, 0.75, SURVIVE_COLOR, 5.0, 8)
