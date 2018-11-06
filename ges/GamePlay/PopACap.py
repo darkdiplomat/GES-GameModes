@@ -12,10 +12,11 @@ from .Utils.GEWarmUp import GEWarmUp
 from .Utils.GETimer import TimerTracker, Timer
 import random
 import GEEntity, GEPlayer, GEUtil, GEWeapon, GEMPGameRules as GERules, GEGlobal as Glb
+import re
 
-VICTIM_ALERT_COLOR = GEUtil.Color(139, 0, 0, 255)
-SURVIVE_COLOR = GEUtil.Color(0, 170, 0, 200)
-GET_VICTIM_COLOR = GEUtil.Color(170, 170, 170, 144)
+VICTIM_ALERT_COLOR = GEUtil.Color(250, 0, 0, 255)
+SURVIVE_COLOR = GEUtil.Color(0, 150, 0, 200)
+GET_VICTIM_COLOR = GEUtil.Color(170, 170, 170, 150)
 CAP_OBJECTIVE = GEUtil.Color(128, 128, 0, 255)
 USING_API = Glb.API_VERSION_1_2_0
 
@@ -29,10 +30,7 @@ class PopACap(GEScenario):
             survivor = GEPlayer.ToMPPlayer(PopACap.VICTIM)
             if survivor is None:
                 return
-            GEUtil.HudMessage(survivor, "Have a point for living!", -1, 0.75, SURVIVE_COLOR, 5.0)
-            PopACap.notifyothers(survivor.GetCleanPlayerName() + " survived for %i seconds..." % 30)
-            GEUtil.HudMessage(Glb.TEAM_SPECTATOR, survivor.GetCleanPlayerName() + " survived for %i seconds..." % 30,
-                              -1, 0.75, SURVIVE_COLOR, 5.0)
+            GEUtil.HudMessage(survivor, "Have a point for living!", -1, 0.75, SURVIVE_COLOR, 5.0, 1)
             survivor.AddRoundScore(1)
 
     def __init__(self):
@@ -43,6 +41,8 @@ class PopACap(GEScenario):
         self.capSurviveTimer = self.timerTracker.CreateTimer("capSurvive")
         self.capSurviveTimer.SetUpdateCallback(self.caplived)
         self.waitingForPlayers = True  # need more than 1 player for this mode
+        self.reduceDamage = False
+        self.surviveTime = 30
 
     def GetPrintName(self):
         return "Pop-A-Cap"
@@ -58,11 +58,16 @@ class PopACap(GEScenario):
                                 "Selected randomly, one player will be selected as the 'victim' which everyone has to "
                                 "try and track down. Whoever blasts the target will score 2 points, then another "
                                 "player will become the target. If you're the target, you'll score 1 point if you "
-                                "survive for 30 seconds.")
+                                "survive for a period of time.")
 
     def OnLoadGamePlay(self):
         # Pre-cache the popped a cap sound
         GEUtil.PrecacheSound("GEGamePlay.Token_Grab")
+
+        self.CreateCVar("pap_reduced_damage", "0",
+                        "Reduces the damage to non-victim players by 90% (0 to disable, 1 to enable)")
+        self.CreateCVar("pap_survive_time", "30",
+                        "The amount of time in seconds the victim should survive before being awarded a point (default=30)")
 
         # Make sure we don't start out in wait time or have a warmup if we changed gameplay mid-match
         if GERules.GetNumActivePlayers() > 1:
@@ -77,6 +82,12 @@ class PopACap(GEScenario):
         self.capSurviveTimer.Stop()
         self.capSurviveTimer = None
         PopACap.VICTIM = None
+
+    def OnCVarChanged( self, name, oldvalue, newvalue ):
+        if name == "pap_reduced_damage":
+            self.reduceDamage = True if newvalue is "1" else False
+        elif name == "pap_survive_time" and int(newvalue) > 0:
+            self.surviveTime = int(newvalue)
 
     def OnRoundBegin(self):
         GEScenario.OnRoundBegin(self)
@@ -104,9 +115,6 @@ class PopACap(GEScenario):
             else:
                 GEUtil.HudMessage(None, "#GES_GP_GETREADY", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5)
                 GERules.EndRound(False)
-        # Did players leave?
-        if not self.waitingForPlayers and GERules.GetNumActivePlayers() <= 1:
-            GERules.EndRound()
 
     def OnPlayerKilled(self, victim, killer, weapon):
         if not victim:
@@ -119,11 +127,11 @@ class PopACap(GEScenario):
 
         if victim.GetUID() == self.VICTIM and killer is not None:
             self.capSurviveTimer.Stop()  # Victim didn't survive
-            GEUtil.HudMessage(killer, "Well Done! You Popped a Cap!", -1, 0.73, SURVIVE_COLOR, 5.0, 5)
-            GEUtil.HudMessage(killer, "Have 2 points...", -1, 0.75, SURVIVE_COLOR, 5.0, 6)
-            GEUtil.HudMessage(Glb.TEAM_SPECTATOR, killer.GetCleanPlayerName() + " popped the cap!",
-                              -1, 0.75, SURVIVE_COLOR, 5.0, 8)
-            self.notifyothers(killer.GetCleanPlayerName() + " popped the cap!")
+            name = self.scrubcolors(killer.GetCleanPlayerName())
+            GEUtil.HudMessage(killer, "Well Done! You Popped a Cap!", -1, 0.72, SURVIVE_COLOR, 5.0, 2)
+            GEUtil.HudMessage(killer, "Have 2 points...", -1, 0.75, SURVIVE_COLOR, 5.0, 3)
+            GEUtil.HudMessage(Glb.TEAM_OBS, name + " popped the cap!", -1, 0.75, SURVIVE_COLOR, 5.0, 8)
+            self.notifyothers(name + " popped the cap!", killer)
             killer.AddRoundScore(2)
             GERules.GetRadar().DropRadarContact(victim)
             victim.SetScoreBoardColor(Glb.SB_COLOR_WHITE)
@@ -142,12 +150,25 @@ class PopACap(GEScenario):
             self.choosenewvictim()
         return True
 
+    def CalculateCustomDamage(self, victim, info, health, armor):
+        # if reduced non-victim damage is enable, reduce damage by 90%
+        if self.reduceDamage:
+            killer = GEPlayer.ToMPPlayer(info.GetAttacker())
+            if killer.GetUID() == self.VICTIM:
+                return health, armor
+            if victim.GetUID() != self.VICTIM:
+                if killer is not None:
+                    armor -= armor * 0.9
+                    health -= health * 0.9
+                    return health, armor
+        return health, armor
+
     def choosenewvictim(self):
         # Check to see if more than one player is around
         iplayers = []
 
         for player in GetPlayers():
-            if not player.IsDead() and player.IsInRound() and player.GetUID() != PopACap.VICTIM:
+            if player.IsInRound() and player.GetUID() != PopACap.VICTIM:
                 iplayers.append(player)
 
         numplayers = len(iplayers)
@@ -159,19 +180,26 @@ class PopACap(GEScenario):
             newvictim = iplayers[i]
             iplayers.remove(newvictim)
             PopACap.VICTIM = newvictim.GetUID()
-            GEUtil.HudMessage(newvictim, "You are the victim", -1, 0.65, VICTIM_ALERT_COLOR, 5.0, 7)
+            GEUtil.HudMessage(newvictim, "You are the victim", -1, 0.69, VICTIM_ALERT_COLOR, 5.0, 4)
             for player in iplayers:
-                GEUtil.HudMessage(player, "Get %s" % newvictim.GetCleanPlayerName(),
-                                  -1, 0.65, GET_VICTIM_COLOR, 5.0, 7)
-            GEUtil.HudMessage(Glb.TEAM_SPECTATOR, "%s is the victim" % newvictim.GetCleanPlayerName(),
-                              -1, 0.65, GET_VICTIM_COLOR, 5.0, 7)
-            self.capSurviveTimer.Start(30, True)  # TODO: Configurable timer?
+                GEUtil.HudMessage(player, "Get %s" % self.scrubcolors(newvictim.GetCleanPlayerName()),
+                                  -1, -1, GET_VICTIM_COLOR, 5.0, 5)
+            GEUtil.HudMessage(Glb.TEAM_OBS, "%s is the victim" % self.scrubcolors(newvictim.GetCleanPlayerName()),
+                              -1, 0.69, GET_VICTIM_COLOR, 5.0, 6)
+            self.capSurviveTimer.Start(self.surviveTime, True)
             GERules.GetRadar().AddRadarContact(newvictim, Glb.RADAR_TYPE_PLAYER, True, "sprites/hud/radar/star")
             GERules.GetRadar().SetupObjective(newvictim, Glb.TEAM_NONE, "", "VICTIM", CAP_OBJECTIVE, 300)
             newvictim.SetScoreBoardColor(Glb.SB_COLOR_GOLD)
 
     @staticmethod
-    def notifyothers(msg):
+    def notifyothers(msg, omit=None):
         for player in GetPlayers():
+            if omit is not None:
+                if omit.GetUID() == player.GetUID():
+                    continue
             if player.GetUID() != PopACap.VICTIM:
-                GEUtil.HudMessage(player, msg, -1, 0.75, SURVIVE_COLOR, 5.0, 8)
+                GEUtil.HudMessage(player, msg, -1, 0.75, SURVIVE_COLOR, 5.0, 7)
+
+    @staticmethod
+    def scrubcolors(msg):  # cause GetCleanPlayerName isn't perfect
+        return re.sub('\^[A-Za-z0-9]', '', msg)
