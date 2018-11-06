@@ -7,7 +7,7 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 from . import GEScenario
-from .Utils import GetPlayers
+from .Utils import GetPlayers, clamp
 from .Utils.GEWarmUp import GEWarmUp
 from .Utils.GETimer import TimerTracker, Timer
 import random
@@ -86,8 +86,8 @@ class PopACap(GEScenario):
     def OnCVarChanged( self, name, oldvalue, newvalue ):
         if name == "pap_reduced_damage":
             self.reduceDamage = True if newvalue is "1" else False
-        elif name == "pap_survive_time" and int(newvalue) > 0:
-            self.surviveTime = int(newvalue)
+        elif name == "pap_survive_time":
+            self.surviveTime = clamp(int(newvalue), 5, 60)
 
     def OnRoundBegin(self):
         GEScenario.OnRoundBegin(self)
