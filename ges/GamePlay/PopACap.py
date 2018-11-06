@@ -54,7 +54,11 @@ class PopACap(GEScenario):
         return Glb.TEAMPLAY_NONE  # I don't think TeamPlay will work well here
 
     def GetScenarioHelp(self, help_obj):
-        help_obj.SetDescription("")
+        help_obj.SetDescription("Track down the target and blast them to score points. "
+                                "Selected randomly, one player will be selected as the 'victim' which everyone has to "
+                                "try and track down. Whoever blasts the target will score 2 points, then another "
+                                "player will become the target. If you're the target, you'll score 1 point if you "
+                                "survive for 30 seconds.")
 
     def OnLoadGamePlay(self):
         # Pre-cache the popped a cap sound
