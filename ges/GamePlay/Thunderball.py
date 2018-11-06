@@ -21,21 +21,22 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 from . import GEScenario
-from .Utils import _
+from .Utils import _, clamp
 from .Utils.GEPlayerTracker import GEPlayerTracker
 from .Utils.GEWarmUp import GEWarmUp
 from .Utils.GETimer import TimerTracker, Timer
 import random
 import GEEntity, GEPlayer, GEUtil, GEWeapon, GEMPGameRules as GERules, GEGlobal as Glb
+import re
 
 USING_API = Glb.API_VERSION_1_2_0
 
 TR_ELIMINATED = "eliminated"
 TR_SPAWNED = "spawned"
-ALERT_COLOR = GEUtil.Color(139, 0, 0, 220)
-RELIEF_COLOR = GEUtil.Color(170, 170, 170, 220)
-SURVIVE_COLOR = GEUtil.Color(0, 170, 0, 220)
-DETONATE_TIME = 25
+ALERT_COLOR = GEUtil.Color(255, 0, 0, 255)
+RELIEF_COLOR = GEUtil.Color(150, 150, 150, 220)
+SURVIVE_COLOR = GEUtil.Color(0, 190, 0, 220)
+TIMER_COLOR = GEUtil.Color(200, 200, 200, 255)
 
 
 class Thunderball(GEScenario):
@@ -44,6 +45,8 @@ class Thunderball(GEScenario):
     PLTRACKER = None  # playertracker
     ASSIGNED_ONCE = False  # check that the Thunderball has been assigned at least once
     CAN_ASSIGN = False
+    TIMER_ADJUST = False
+    DETONATE_TIME = 25
 
     @staticmethod
     def initialAssignment(timer, type_):
@@ -70,6 +73,10 @@ class Thunderball(GEScenario):
                     if Thunderball.isinplay(player):
                         player.AddRoundScore(1)
                         GEUtil.HudMessage(player, "Have a point for not blowing up!", -1, 0.71, SURVIVE_COLOR, 5.0, 8)
+            if Thunderball.TIMER_ADJUST:
+                timer.Stop()
+                timer.Start(Thunderball.DETONATE_TIME, True)
+                Thunderball.TIMER_ADJUST = False
 
     def __init__(self):
         super(Thunderball, self).__init__()
@@ -93,7 +100,7 @@ class Thunderball(GEScenario):
         return Glb.TEAMPLAY_NONE
 
     def GetScenarioHelp(self, help_obj):
-        help_obj.SetDescription("The Thunderball is set to explode every 25 seconds! "
+        help_obj.SetDescription("The Thunderball is set to explode at a set interval! "
                                 "To start, the ball is given to a random player. "
                                 "The player has to kill an opponent to get rid of the ball. "
                                 "If the player is unable to do that they are eliminated from the round "
@@ -109,7 +116,9 @@ class Thunderball(GEScenario):
         GEUtil.PrecacheSound("GEGamePlay.Woosh")  # sound for passing the thunderball
 
         GERules.AllowRoundTimer(False)
-        self.warmupTimer.Reset()
+
+        self.CreateCVar("tb_detonator", "30",
+                        "The amount of time in seconds the between Thunderball detonations (default=25)")
 
         # Make sure we don't start out in wait time or have a warmup if we changed gameplay mid-match
         if GERules.GetNumActivePlayers() > 1:
@@ -125,13 +134,18 @@ class Thunderball(GEScenario):
         self.thunderballTimer.Stop()
         self.thunderballTimer = None
 
+    def OnCVarChanged(self, name, oldvalue, newvalue):
+        if name == "tb_detonator":
+            Thunderball.DETONATE_TIME = clamp(int(newvalue), 10, 60)
+            Thunderball.TIMER_ADJUST = True
+
     def OnPlayerConnect(self, player):
         Thunderball.PLTRACKER[player][TR_SPAWNED] = False
         Thunderball.PLTRACKER[player][TR_ELIMINATED] = False
         if GERules.IsRoundLocked():
             Thunderball.PLTRACKER[player][TR_ELIMINATED] = True
 
-    def CanPlayerChangeTeam( self, player, oldteam, newteam, wasforced ):
+    def CanPlayerChangeTeam(self, player, oldteam, newteam, wasforced):
         if GERules.IsRoundLocked():
             if oldteam == Glb.TEAM_SPECTATOR:
                 GEUtil.PopupMessage(player, "#GES_GPH_CANTJOIN_TITLE", "#GES_GPH_CANTJOIN")
@@ -151,7 +165,7 @@ class Thunderball(GEScenario):
                 if self.thunderballTimer.state == Timer.STATE_PAUSE:
                     self.thunderballTimer.Start()
                 elif self.thunderballTimer.state == Timer.STATE_STOP:
-                    self.thunderballTimer.Start(DETONATE_TIME, True)
+                    self.thunderballTimer.Start(Thunderball.DETONATE_TIME, True)
             if player.IsInitialSpawn() and not self.isinplay(player):
                 GEUtil.PopupMessage(player, "#GES_GPH_CANTJOIN_TITLE", "#GES_GPH_CANTJOIN")
 
@@ -205,11 +219,16 @@ class Thunderball(GEScenario):
                         self.assignThunderball(self.chooserandom())
                 else:
                     self.assignThunderball(self.chooserandom())
-            remain = DETONATE_TIME - int(self.thunderballTimer.GetCurrentTime())
-            GEUtil.HudMessage(None, "Thunderball Detonation in %0.0f sec" % remain, -1, 0.12, ALERT_COLOR, 1.0, 5)
+            remain = Thunderball.DETONATE_TIME - int(self.thunderballTimer.GetCurrentTime())
+            if remain <= 5:
+                GEUtil.HudMessage(None, "Thunderball Detonation in %i sec" % remain, -1, 0.12, ALERT_COLOR, 1.0, 5)
+            else:
+                GEUtil.HudMessage(None, "Thunderball Detonation in %i sec" % remain, -1, 0.12, TIMER_COLOR, 1.0, 5)
+
             if remain == 6:  # it takes a moment to play the sound
                 owner = GEPlayer.ToMPPlayer(Thunderball.THUNDERBALL_OWNER)
                 GEUtil.PlaySoundToPlayer(owner, "GEGamePlay.Level_Down")
+                GEUtil.HudMessage(owner, "YOU HAVE THE THUNDERBALL!", -1, -1, ALERT_COLOR, 3.0, 6)
             self.chooserandom()  # this works to end the round
 
     def OnPlayerKilled(self, victim, killer, weapon):
@@ -240,7 +259,7 @@ class Thunderball(GEScenario):
     def CalculateCustomDamage(self, victim, info, health, armor):
         if victim.GetUID() == Thunderball.THUNDERBALL_OWNER:
             killer = GEPlayer.ToMPPlayer(info.GetAttacker())
-            # If being attacked reduce damage by 20% (i think)
+            # If being attacked reduce damage by 20%
             if killer is not None:
                 armor -= armor * 0.2
                 health -= health * 0.2
@@ -272,14 +291,15 @@ class Thunderball(GEScenario):
 
         Thunderball.THUNDERBALL_OWNER = newowner.GetUID()
         GEUtil.PlaySoundToPlayer(newowner, "GEGamePlay.Woosh")
-        GEUtil.HudMessage(newowner, "You have been given Thunderball!", -1, 0.75, ALERT_COLOR, 5.0, 6)
-        GEUtil.HudMessage(Glb.TEAM_SPECTATOR, newowner.GetCleanPlayerName() + " has the Thunderball!", -1, 0.75, ALERT_COLOR, 5.0, 8)
+        GEUtil.HudMessage(newowner, "You have been given Thunderball!", -1, -1, ALERT_COLOR, 3.0, 6)
+        GEUtil.HudMessage(Glb.TEAM_OBS, self.scrubcolors(newowner.GetCleanPlayerName()) + " has the Thunderball!",
+                          -1, 0.75, ALERT_COLOR, 5.0, 8)
         newowner.SetSpeedMultiplier(1.25)
         Thunderball.ASSIGNED_ONCE = True
         if self.thunderballTimer.state == Timer.STATE_PAUSE:
             self.thunderballTimer.Start()
         elif self.thunderballTimer.state == Timer.STATE_STOP:
-            self.thunderballTimer.Start(DETONATE_TIME, True)
+            self.thunderballTimer.Start(Thunderball.DETONATE_TIME, True)
         if oldowner is not None:
             GEUtil.PlaySoundToPlayer(oldowner, "GEGamePlay.Woosh")
             GEUtil.HudMessage(oldowner, "You have passed the Thunderball!", -1, 0.73, RELIEF_COLOR, 5.0, 7)
@@ -290,3 +310,7 @@ class Thunderball(GEScenario):
     def isinplay(player):
         return player.GetTeamNumber() is not Glb.TEAM_SPECTATOR and Thunderball.PLTRACKER[player][TR_SPAWNED] \
                and not Thunderball.PLTRACKER[player][TR_ELIMINATED]
+
+    @staticmethod
+    def scrubcolors(msg):
+        return re.sub('\^[A-Za-z0-9]', '', msg)
