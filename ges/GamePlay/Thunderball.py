@@ -47,6 +47,7 @@ class Thunderball(GEScenario):
     CAN_ASSIGN = False
     TIMER_ADJUST = False
     DETONATE_TIME = 25
+    PLAYER_WAIT_TICKER = 0
 
     @staticmethod
     def initialAssignment(timer, type_):
@@ -195,13 +196,17 @@ class Thunderball(GEScenario):
 
     def OnThink(self):
         # Check to see if we can get out of warmup
-        if self.waitingForPlayers and GERules.GetNumActivePlayers() > 1:
-            self.waitingForPlayers = False
-            Thunderball.PLTRACKER.SetValueAll(TR_SPAWNED, True)
-            if not self.warmupTimer.HadWarmup():
-                self.warmupTimer.StartWarmup(15, True)
-            else:
-                GERules.EndRound(False)
+        if self.waitingForPlayers:
+            if GERules.GetNumActivePlayers() > 1:
+                self.waitingForPlayers = False
+                Thunderball.PLTRACKER.SetValueAll(TR_SPAWNED, True)
+                if not self.warmupTimer.HadWarmup():
+                    self.warmupTimer.StartWarmup(15, True)
+                else:
+                    GERules.EndRound(False)
+            elif GEUtil.GetTime() > self.PLAYER_WAIT_TICKER:
+                GEUtil.HudMessage(None, "#GES_GP_WAITING", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5, 1)
+                self.PLAYER_WAIT_TICKER = GEUtil.GetTime() + 12.5
 
         # check if we can do the initial assignment of the Thunderball
         if Thunderball.CAN_ASSIGN and not Thunderball.ASSIGNED_ONCE:
