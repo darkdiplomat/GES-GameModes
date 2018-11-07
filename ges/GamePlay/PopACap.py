@@ -23,6 +23,7 @@ USING_API = Glb.API_VERSION_1_2_0
 
 class PopACap(GEScenario):
     VICTIM = None
+    PLAYER_WAIT_TICKER = 0
 
     @staticmethod
     def caplived(timer, type_):
@@ -64,9 +65,9 @@ class PopACap(GEScenario):
         # Pre-cache the popped a cap sound
         GEUtil.PrecacheSound("GEGamePlay.Token_Grab")
 
-        self.CreateCVar("pap_reduced_damage", "0",
+        self.CreateCVar("pac_reduced_damage", "0",
                         "Reduces the damage to non-victim players by 90% (0 to disable, 1 to enable)")
-        self.CreateCVar("pap_survive_time", "30",
+        self.CreateCVar("pac_survive_time", "30",
                         "The amount of time in seconds the victim should survive before being awarded a point (default=30)")
 
         # Make sure we don't start out in wait time or have a warmup if we changed gameplay mid-match
@@ -84,9 +85,9 @@ class PopACap(GEScenario):
         PopACap.VICTIM = None
 
     def OnCVarChanged( self, name, oldvalue, newvalue ):
-        if name == "pap_reduced_damage":
+        if name == "pac_reduced_damage":
             self.reduceDamage = True if newvalue is "1" else False
-        elif name == "pap_survive_time":
+        elif name == "pac_survive_time":
             self.surviveTime = clamp(int(newvalue), 5, 60)
 
     def OnRoundBegin(self):
@@ -108,13 +109,17 @@ class PopACap(GEScenario):
 
     def OnThink(self):
         # Check to see if we can get out of warmup
-        if self.waitingForPlayers and GERules.GetNumActivePlayers() > 1:
-            self.waitingForPlayers = False
-            if not self.warmupTimer.HadWarmup():
-                self.warmupTimer.StartWarmup(15, True)
-            else:
-                GEUtil.HudMessage(None, "#GES_GP_GETREADY", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5)
-                GERules.EndRound(False)
+        if self.waitingForPlayers:
+            if GERules.GetNumActivePlayers() > 1:
+                self.waitingForPlayers = False
+                if not self.warmupTimer.HadWarmup():
+                    self.warmupTimer.StartWarmup(15, True)
+                else:
+                    GEUtil.HudMessage(None, "#GES_GP_GETREADY", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5, 1)
+                    GERules.EndRound(False)
+            elif GEUtil.GetTime() > self.PLAYER_WAIT_TICKER:
+                GEUtil.HudMessage(None, "#GES_GP_WAITING", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5, 1)
+                self.PLAYER_WAIT_TICKER = GEUtil.GetTime() + 12.5
 
     def OnPlayerKilled(self, victim, killer, weapon):
         if not victim:
