@@ -65,7 +65,8 @@ class PopACap(GEScenario):
 
     def OnLoadGamePlay(self):
         # Pre-cache the popped a cap sound
-        GEUtil.PrecacheSound("GEGamePlay.Token_Grab")
+        GEUtil.PrecacheSound("GEGamePlay.Token_Grab")  # sound for popping the cap
+        GEUtil.PrecacheSound("GEGamePlay.Level_Down")  # sound for becoming the victim
 
         self.CreateCVar("pac_reduced_damage", "0",
                         "Reduces the damage to non-victim players by 90% (0 to disable, 1 to enable)")
@@ -139,6 +140,7 @@ class PopACap(GEScenario):
         if victim.GetUID() == self.VICTIM and killer is not None:
             self.capSurviveTimer.Stop()  # Victim didn't survive
             name = self.scrubcolors(killer.GetCleanPlayerName())
+            GEUtil.PlaySoundToPlayer(killer, "GEGamePlay.Token_Grab")
             GEUtil.HudMessage(killer, "Well Done! You Popped a Cap!", -1, 0.72, SURVIVE_COLOR, 5.0, 2)
             GEUtil.HudMessage(killer, "Have 2 points...", -1, 0.75, SURVIVE_COLOR, 5.0, 3)
             GEUtil.HudMessage(Glb.TEAM_OBS, name + " popped the cap!", -1, 0.75, SURVIVE_COLOR, 5.0, 8)
@@ -197,6 +199,7 @@ class PopACap(GEScenario):
         # # #
 
         PopACap.VICTIM = newvictim.GetUID()
+        GEUtil.PlaySoundToPlayer(newvictim, "GEGamePlay.Level_Down")
         GEUtil.HudMessage(newvictim, "You are the victim", -1, 0.69, VICTIM_ALERT_COLOR, 5.0, 4)
         for player in iplayers:
             GEUtil.HudMessage(player, "Get %s" % self.scrubcolors(newvictim.GetCleanPlayerName()),
@@ -204,7 +207,7 @@ class PopACap(GEScenario):
         GEUtil.HudMessage(Glb.TEAM_OBS, "%s is the victim" % self.scrubcolors(newvictim.GetCleanPlayerName()),
                           -1, 0.69, GET_VICTIM_COLOR, 5.0, 6)
         self.capSurviveTimer.Start(self.surviveTime, True)
-        GERules.GetRadar().AddRadarContact(newvictim, Glb.RADAR_TYPE_PLAYER, True, "sprites/hud/radar/star")
+        GERules.GetRadar().AddRadarContact(newvictim, Glb.RADAR_TYPE_PLAYER, True, "sprites/hud/radar/xsm")
         GERules.GetRadar().SetupObjective(newvictim, Glb.TEAM_NONE, "", "VICTIM", CAP_OBJECTIVE, 300)
         newvictim.SetScoreBoardColor(Glb.SB_COLOR_GOLD)
 
