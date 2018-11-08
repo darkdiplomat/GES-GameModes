@@ -1,6 +1,6 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Thunderball
-# Beta v1.0
+# v1.0
 # By: DarkDiplomat
 #
 # Based loosely on concepts layout at https://forums.geshl2.com/index.php/topic,5573.0.html
@@ -89,6 +89,7 @@ class Thunderball(GEScenario):
         self.thunderballTimer = self.timeTracker.CreateTimer("thunderballTimer")  # init timer
         self.thunderballTimer.SetUpdateCallback(self.detonator)  # add our callback method to the timer
         self.waitingForPlayers = True
+        self.deathPause = False  # CVar Holder
         Thunderball.PLTRACKER = GEPlayerTracker(self)  # init the player tracker
 
     def GetPrintName(self):
@@ -120,6 +121,8 @@ class Thunderball(GEScenario):
 
         self.CreateCVar("tb_detonator", "30",
                         "The amount of time in seconds the between Thunderball detonations (default=25)")
+        self.CreateCVar("tb_death_pause", "0",
+                        "Pauses the Thunderball timer on player death, set to 1 to enable (default 0 [disabled])")
 
         # Make sure we don't start out in wait time or have a warmup if we changed gameplay mid-match
         if GERules.GetNumActivePlayers() > 1:
@@ -139,6 +142,8 @@ class Thunderball(GEScenario):
         if name == "tb_detonator":
             Thunderball.DETONATE_TIME = clamp(int(newvalue), 10, 60)
             Thunderball.TIMER_ADJUST = True
+        elif name == "tb_death_pause":
+            self.deathPause = int(newvalue) >= 1
 
     def OnPlayerConnect(self, player):
         Thunderball.PLTRACKER[player][TR_SPAWNED] = False
@@ -251,7 +256,8 @@ class Thunderball(GEScenario):
                 Thunderball.LAST_AGGRESSOR = killer.GetUID()
                 GEUtil.EmitGameplayEvent("tb_passed", str(killer.GetUID()), str(victim.GetUID()), "", "", True)
         if victim.GetUID() == Thunderball.THUNDERBALL_OWNER:
-            # self.thunderballTimer.Pause()  # Give them a chance to respawn
+            if self.deathPause:
+                self.thunderballTimer.Pause()  # Give them a chance to respawn
             if killer:
                 Thunderball.LAST_AGGRESSOR = killer.GetUID()
                 killer.AddRoundScore(1)  # Give the ballsy player an extra point for taking a risk at being the next ball carrier
