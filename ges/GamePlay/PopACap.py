@@ -23,6 +23,8 @@ USING_API = Glb.API_VERSION_1_2_0
 
 class PopACap(GEScenario):
     VICTIM = None
+    PRV_VIC1 = None
+    PRV_VIC2 = None
     PLAYER_WAIT_TICKER = 0
 
     @staticmethod
@@ -120,6 +122,10 @@ class PopACap(GEScenario):
             elif GEUtil.GetTime() > self.PLAYER_WAIT_TICKER:
                 GEUtil.HudMessage(None, "#GES_GP_WAITING", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5, 1)
                 self.PLAYER_WAIT_TICKER = GEUtil.GetTime() + 12.5
+        if not self.waitingForPlayers and GERules.GetNumActivePlayers() < 2:
+            self.waitingForPlayers = True
+            GERules.EndRound()
+
 
     def OnPlayerKilled(self, victim, killer, weapon):
         if not victim:
@@ -173,28 +179,34 @@ class PopACap(GEScenario):
         iplayers = []
 
         for player in GetPlayers():
-            if player.IsInRound() and player.GetUID() != PopACap.VICTIM:
+            if player.IsInRound() and player.GetUID() != PopACap.VICTIM\
+                    and player.GetUID() != PopACap.PRV_VIC1\
+                    and player.GetUID() != PopACap.PRV_VIC2:
                 iplayers.append(player)
 
         numplayers = len(iplayers)
-        if numplayers <= 1:
-            # not enough players to continue
-            GERules.EndRound()
-        else:
-            i = random.randint(1, numplayers) - 1
-            newvictim = iplayers[i]
-            iplayers.remove(newvictim)
-            PopACap.VICTIM = newvictim.GetUID()
-            GEUtil.HudMessage(newvictim, "You are the victim", -1, 0.69, VICTIM_ALERT_COLOR, 5.0, 4)
-            for player in iplayers:
-                GEUtil.HudMessage(player, "Get %s" % self.scrubcolors(newvictim.GetCleanPlayerName()),
-                                  -1, -1, GET_VICTIM_COLOR, 5.0, 5)
-            GEUtil.HudMessage(Glb.TEAM_OBS, "%s is the victim" % self.scrubcolors(newvictim.GetCleanPlayerName()),
-                              -1, 0.69, GET_VICTIM_COLOR, 5.0, 6)
-            self.capSurviveTimer.Start(self.surviveTime, True)
-            GERules.GetRadar().AddRadarContact(newvictim, Glb.RADAR_TYPE_PLAYER, True, "sprites/hud/radar/star")
-            GERules.GetRadar().SetupObjective(newvictim, Glb.TEAM_NONE, "", "VICTIM", CAP_OBJECTIVE, 300)
-            newvictim.SetScoreBoardColor(Glb.SB_COLOR_GOLD)
+        i = random.randint(1, numplayers) - 1
+        newvictim = iplayers[i]
+        iplayers.remove(newvictim)
+
+        # If enough players, avoid making a previous victim a victim again soon
+        if numplayers >= 5:
+            PopACap.PRV_VIC2 = PopACap.PRV_VIC1
+        if numplayers >= 3:
+            PopACap.PRV_VIC1 = PopACap.VICTIM
+        # # #
+
+        PopACap.VICTIM = newvictim.GetUID()
+        GEUtil.HudMessage(newvictim, "You are the victim", -1, 0.69, VICTIM_ALERT_COLOR, 5.0, 4)
+        for player in iplayers:
+            GEUtil.HudMessage(player, "Get %s" % self.scrubcolors(newvictim.GetCleanPlayerName()),
+                              -1, -1, GET_VICTIM_COLOR, 5.0, 5)
+        GEUtil.HudMessage(Glb.TEAM_OBS, "%s is the victim" % self.scrubcolors(newvictim.GetCleanPlayerName()),
+                          -1, 0.69, GET_VICTIM_COLOR, 5.0, 6)
+        self.capSurviveTimer.Start(self.surviveTime, True)
+        GERules.GetRadar().AddRadarContact(newvictim, Glb.RADAR_TYPE_PLAYER, True, "sprites/hud/radar/star")
+        GERules.GetRadar().SetupObjective(newvictim, Glb.TEAM_NONE, "", "VICTIM", CAP_OBJECTIVE, 300)
+        newvictim.SetScoreBoardColor(Glb.SB_COLOR_GOLD)
 
     @staticmethod
     def notifyothers(msg, omit=None):
