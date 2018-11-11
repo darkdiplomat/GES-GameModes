@@ -1,9 +1,9 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Pop-A-Cap
-# Beta v1.0
+# v1.0
 # By: DarkDiplomat
 #
-# Based on the Perfect Dark Game Mode
+# Based on the concept of the original Perfect Dark Game Mode
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 from . import GEScenario
@@ -44,8 +44,12 @@ class PopACap(GEScenario):
         self.capSurviveTimer = self.timerTracker.CreateTimer("capSurvive")
         self.capSurviveTimer.SetUpdateCallback(self.caplived)
         self.waitingForPlayers = True  # need more than 1 player for this mode
-        self.reduceDamage = False
+
+        # CVars
+        self.reduceDamage = True
         self.surviveTime = 30
+        self.victimScores = False
+        self.classicMode = False
 
     def GetPrintName(self):
         return "Pop-A-Cap"
@@ -68,10 +72,16 @@ class PopACap(GEScenario):
         GEUtil.PrecacheSound("GEGamePlay.Token_Grab")  # sound for popping the cap
         GEUtil.PrecacheSound("GEGamePlay.Level_Down")  # sound for becoming the victim
 
-        self.CreateCVar("pac_reduced_damage", "0",
+        self.CreateCVar("pac_reduced_damage", "1",
                         "Reduces the damage to non-victim players by 90% (0 to disable, 1 to enable)")
         self.CreateCVar("pac_survive_time", "30",
-                        "The amount of time in seconds the victim should survive before being awarded a point (default=30)")
+                        "The amount of time in seconds the victim should survive before being awarded a point "
+                        "(default=30, range 5 - 60)")
+        self.CreateCVar("pac_victim_scoring", "0",
+                        "Enables the victim to score (all kills score) (1 to enable, 0 to disable)")
+        self.CreateCVar("pac_classic_mode", "0",
+                        "Enables the original Perfect Dark Settings (ie: 1 minute survive timer, normal damage, and "
+                        "death match scoring [all kills score]. Overrides Timer and Reduced Damage settings)")
 
         # Make sure we don't start out in wait time or have a warmup if we changed gameplay mid-match
         if GERules.GetNumActivePlayers() > 1:
@@ -89,9 +99,20 @@ class PopACap(GEScenario):
 
     def OnCVarChanged( self, name, oldvalue, newvalue ):
         if name == "pac_reduced_damage":
-            self.reduceDamage = True if newvalue is "1" else False
+            if not self.classicMode:
+                self.reduceDamage = int(newvalue) >= 1
         elif name == "pac_survive_time":
-            self.surviveTime = clamp(int(newvalue), 5, 60)
+            if not self.classicMode:
+                self.surviveTime = clamp(int(newvalue), 5, 60)
+        elif name == "pac_victim_scoring":
+            if not self.classicMode:
+                self.victimScores = True
+        elif name == "pac_classic_mode":
+            self.classicMode = int(newvalue) >= 1
+            if self.classicMode:
+                # set classic mode settings if enabled
+                self.surviveTime = 60
+                self.reduceDamage = False
 
     def OnRoundBegin(self):
         GEScenario.OnRoundBegin(self)
@@ -109,6 +130,8 @@ class PopACap(GEScenario):
         self.capSurviveTimer.Stop()
         GERules.GetRadar().DropRadarContact(GEPlayer.ToMPPlayer(self.VICTIM))
         PopACap.VICTIM = None
+        PopACap.PRV_VIC1 = None
+        PopACap.PRV_VIC2 = None
 
     def OnThink(self):
         # Check to see if we can get out of warmup
@@ -122,11 +145,11 @@ class PopACap(GEScenario):
                     GERules.EndRound(False)
             elif GEUtil.GetTime() > self.PLAYER_WAIT_TICKER:
                 GEUtil.HudMessage(None, "#GES_GP_WAITING", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5, 1)
+                GEUtil.HudMessage(None, "Need %i more players", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5, 1)
                 self.PLAYER_WAIT_TICKER = GEUtil.GetTime() + 12.5
         if not self.waitingForPlayers and GERules.GetNumActivePlayers() < 2:
             self.waitingForPlayers = True
             GERules.EndRound()
-
 
     def OnPlayerKilled(self, victim, killer, weapon):
         if not victim:
@@ -139,16 +162,28 @@ class PopACap(GEScenario):
 
         if victim.GetUID() == self.VICTIM and killer is not None:
             self.capSurviveTimer.Stop()  # Victim didn't survive
-            name = self.scrubcolors(killer.GetCleanPlayerName())
-            GEUtil.PlaySoundToPlayer(killer, "GEGamePlay.Token_Grab")
-            GEUtil.HudMessage(killer, "Well Done! You Popped a Cap!", -1, 0.72, SURVIVE_COLOR, 5.0, 2)
-            GEUtil.HudMessage(killer, "Have 2 points...", -1, 0.75, SURVIVE_COLOR, 5.0, 3)
-            GEUtil.HudMessage(Glb.TEAM_OBS, name + " popped the cap!", -1, 0.75, SURVIVE_COLOR, 5.0, 8)
-            self.notifyothers(name + " popped the cap!", killer)
-            killer.AddRoundScore(2)
+
+            # If victim didn't kill thyself then award points
+            if killer != victim:
+                name = self.scrubcolors(killer.GetCleanPlayerName())
+                GEUtil.PlaySoundToPlayer(killer, "GEGamePlay.Token_Grab")
+                GEUtil.HudMessage(killer, "Well Done! You Popped a Cap!", -1, 0.72, SURVIVE_COLOR, 5.0, 2)
+                GEUtil.HudMessage(killer, "Have 2 points...", -1, 0.75, SURVIVE_COLOR, 5.0, 3)
+                GEUtil.HudMessage(Glb.TEAM_OBS, name + " popped the cap!", -1, 0.75, SURVIVE_COLOR, 5.0, 8)
+                self.notifyothers(name + " popped the cap!", killer)
+                killer.AddRoundScore(2)
+
+            # reset radar and scoreboard, pick new victim
             GERules.GetRadar().DropRadarContact(victim)
             victim.SetScoreBoardColor(Glb.SB_COLOR_WHITE)
             self.choosenewvictim()
+        elif self.victimScores and not self.classicMode and killer.UID() == self.VICTIM:
+            # Victim scoring is enabled
+            GEScenario.OnPlayerKilled(self, victim, killer, weapon)
+
+        # Classic Mode is enabled
+        if self.classicMode:
+            GEScenario.OnPlayerKilled(self, victim, killer, weapon)
 
     def OnPlayerDisconnect(self, player):
         if player.GetUID() == PopACap.VICTIM:
@@ -165,7 +200,7 @@ class PopACap(GEScenario):
 
     def CalculateCustomDamage(self, victim, info, health, armor):
         # if reduced non-victim damage is enable, reduce damage by 90%
-        if self.reduceDamage:
+        if self.reduceDamage and not self.classicMode:
             killer = GEPlayer.ToMPPlayer(info.GetAttacker())
             if killer.GetUID() == self.VICTIM:
                 return health, armor
@@ -192,9 +227,9 @@ class PopACap(GEScenario):
         iplayers.remove(newvictim)
 
         # If enough players, avoid making a previous victim a victim again soon
-        if numplayers >= 5:
+        if numplayers >= 4:
             PopACap.PRV_VIC2 = PopACap.PRV_VIC1
-        if numplayers >= 3:
+        if numplayers >= 2:
             PopACap.PRV_VIC1 = PopACap.VICTIM
         # # #
 
