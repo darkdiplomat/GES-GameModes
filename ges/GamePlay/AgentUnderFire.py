@@ -93,6 +93,7 @@ class AgentUnderFire( GEScenario ):
         self.EndRoundTime = 34
         self.EndRound = False
         self.RoundActive = False
+        self.HasEnded = False
 
         # Player Tracker
         self.pltracker = GEPlayerTracker( self )
@@ -138,18 +139,24 @@ class AgentUnderFire( GEScenario ):
                 self.Adrenaline = False
                 GEUtil.HudMessage( None, "Adrenaline was disabled!", -1, -1, Color( 255, 255, 255, 255 ), 4.0 )
                 if not self.WaitingForPlayers and not self.warmupTimer.IsInWarmup():
-                    GERules.EndRound()
+                    if not self.HasEnded:
+                        self.HasEnded = True
+                        GERules.EndRound()
             elif val != 0 and not self.Adrenaline:
                 self.Adrenaline = True
                 GEUtil.HudMessage( None, "Adrenaline was enabled!", -1, -1, Color( 255, 255, 255, 255 ), 4.0 )
                 if not self.WaitingForPlayers and not self.warmupTimer.IsInWarmup():
-                    GERules.EndRound()
+                    if not self.HasEnded:
+                        self.HasEnded = True
+                        GERules.EndRound()
         elif name == "auf_warmuptime":
             if self.warmupTimer.IsInWarmup():
                 val = int( newvalue )
                 self.warmupTimer.StartWarmup( val )
                 if val <= 0:
-                    GERules.EndRound( False )
+                    if not self.HasEnded:
+                        self.HasEnded = True
+                        GERules.EndRound( False )
         elif name == "auf_leveldown":
             val = int(newvalue)
             if val >= 1:
@@ -169,6 +176,7 @@ class AgentUnderFire( GEScenario ):
         self.EndRoundTimer = 0
         self.EndRound = False
         self.RoundActive = True
+        self.HasEnded = False
 
         for player in GetPlayers():
             self.pltracker.SetValue( player, self.TR_ADRENALINE, False )
@@ -183,6 +191,7 @@ class AgentUnderFire( GEScenario ):
         self.EmOurumovRandomly()
 
     def OnRoundEnd( self ):
+        self.HasEnded = True
         self.RoundActive = False
 
     def OnPlayerConnect( self, player ):
@@ -328,7 +337,9 @@ class AgentUnderFire( GEScenario ):
         if GERules.GetNumActiveTeamPlayers( GEGlobal.TEAM_MI6 ) < 2 or GERules.GetNumActiveTeamPlayers( GEGlobal.TEAM_JANUS ) < 2:
             if not self.WaitingForPlayers:
                 self.notice_WaitingForPlayers = 0
-                GERules.EndRound()
+                if not self.HasEnded:
+                    self.HasEnded = True
+                    GERules.EndRound()
             elif GEUtil.GetTime() > self.notice_WaitingForPlayers:
                 GEUtil.HudMessage( None, "#GES_GP_WAITING", -1, -1, Color( 255, 255, 255, 255 ), 2.5, 1 )
                 self.notice_WaitingForPlayers = GEUtil.GetTime() + 12.5
@@ -343,7 +354,9 @@ class AgentUnderFire( GEScenario ):
                 if self.warmupTimer.IsInWarmup():
                     GEUtil.EmitGameplayEvent( "auf_startwarmup" )
             else:
-                GERules.EndRound( False )
+                if not self.HasEnded:
+                    self.HasEnded = True
+                    GERules.EndRound( False )
             return
 
         # Bond Adrenaline
@@ -407,7 +420,9 @@ class AgentUnderFire( GEScenario ):
         if self.EndRoundTimer > 0:
             self.EndRoundTimer -= 1
             if self.EndRoundTimer == 0:
-                GERules.EndRound()
+                if not self.HasEnded:
+                    self.HasEnded = True
+                    GERules.EndRound()
 
     def CanPlayerRespawn( self, player ):
         if self.pltracker.GetValue( player, self.TR_ELIMINATED ):
@@ -489,6 +504,12 @@ class AgentUnderFire( GEScenario ):
                 return True
 
         return False
+
+    def CanRoundEnd( self ):
+        return self.EndRound
+
+    def CanMatchEnd( self ):
+        return not self.RoundActive
 
     def IsInPlay( self, player ):
         return player.GetTeamNumber() != GEGlobal.TEAM_SPECTATOR and self.pltracker.GetValue( player, self.TR_SPAWNED ) and not self.pltracker.GetValue( player, self.TR_ELIMINATED )
