@@ -2,3 +2,4 @@ Revision History:
 1.0 (4/25/11): Initial release.  - WNxVirtualMark
 1.0.1 (4/25/11): Removed line breaks from "Buffs" help popup.  - WNxVirtualMark
 1.1.0 (11/4/18): Updated to GE:S v5.0, made adjustments to the code - DarkDiplomat
+1.2.0 (11/11/18): Added settings to enable death match scoring and eliminating the case holder on death
