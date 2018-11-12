@@ -171,11 +171,14 @@ class PopACap(GEScenario):
                 GEUtil.HudMessage(killer, "Have 2 points...", -1, 0.75, SURVIVE_COLOR, 5.0, 3)
                 GEUtil.HudMessage(Glb.TEAM_OBS, name + " popped the cap!", -1, 0.75, SURVIVE_COLOR, 5.0, 8)
                 self.notifyothers(name + " popped the cap!", killer)
-                killer.AddRoundScore(2)
+                if self.classicMode:
+                    killer.AddRoundScore(1)  # death match scoring adds the second point
+                else:
+                    killer.AddRoundScore(2)
 
             # reset radar and scoreboard, pick new victim
             GERules.GetRadar().DropRadarContact(victim)
-            victim.SetScoreBoardColor(Glb.SB_COLOR_WHITE)
+            victim.SetScoreBoardColor(Glb.SB_COLOR_NORMAL)
             self.choosenewvictim()
         elif self.victimScores and not self.classicMode and killer.UID() == self.VICTIM:
             # Victim scoring is enabled
@@ -243,7 +246,7 @@ class PopACap(GEScenario):
                           -1, 0.69, GET_VICTIM_COLOR, 5.0, 6)
         self.capSurviveTimer.Start(self.surviveTime, True)
         GERules.GetRadar().AddRadarContact(newvictim, Glb.RADAR_TYPE_PLAYER, True, "sprites/hud/radar/xsm")
-        GERules.GetRadar().SetupObjective(newvictim, Glb.TEAM_NONE, "", "VICTIM", CAP_OBJECTIVE, 300)
+        GERules.GetRadar().SetupObjective(newvictim, Glb.TEAM_NONE, "", "VICTIM", CAP_OBJECTIVE, 0)
         newvictim.SetScoreBoardColor(Glb.SB_COLOR_GOLD)
 
     @staticmethod
