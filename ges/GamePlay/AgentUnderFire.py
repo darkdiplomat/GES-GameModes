@@ -170,27 +170,27 @@ class AgentUnderFire( GEScenario ):
         GERules.DisableWeaponSpawns()
         GERules.DisableAmmoSpawns()
 
-        # Reset the variables
-        self.MI6Level = 0
-        self.JanusLevel = 0
-        self.EndRoundTimer = 0
-        self.EndRound = False
-        self.RoundActive = True
-        self.HasEnded = False
+        if self.warmupTimer.HadWarmup():
+            # Reset the variables
+            self.MI6Level = 0
+            self.JanusLevel = 0
+            self.EndRoundTimer = 0
+            self.EndRound = False
+            self.RoundActive = True
+            self.HasEnded = False
+            for player in GetPlayers():
+                self.pltracker.SetValue( player, self.TR_ADRENALINE, False )
+                self.pltracker.SetValue( player, self.TR_ELIMINATED, False )
+                if player.GetTeamNumber() != GEGlobal.TEAM_SPECTATOR:
+                    self.PrintCurLevel( player )
 
-        for player in GetPlayers():
-            self.pltracker.SetValue( player, self.TR_ADRENALINE, False )
-            self.pltracker.SetValue( player, self.TR_ELIMINATED, False )
-            if player.GetTeamNumber() != GEGlobal.TEAM_SPECTATOR:
-                self.PrintCurLevel( player )
-
-        # VIPs
-        self.DisemBond()
-        self.DisemOurumov()
-        self.EmBondRandomly()
-        self.EmOurumovRandomly()
+            # VIPs
+            self.EmBondRandomly()
+            self.EmOurumovRandomly()
 
     def OnRoundEnd( self ):
+        self.DisemBond()
+        self.DisemOurumov()
         self.HasEnded = True
         self.RoundActive = False
 
@@ -207,37 +207,39 @@ class AgentUnderFire( GEScenario ):
             self.pltracker.SetValue( player, self.TR_ELIMINATED, False )
 
     def OnPlayerDisconnect( self, player ):
-        if player.GetUID() == self.BondUID:
-            self.DisemBond()
-            self.EmBondRandomly()
-        elif player.GetUID() == self.OurumovUID:
-            self.DisemOurumov()
-            self.EmOurumovRandomly()
+        if self.RoundActive:
+            if player.GetUID() == self.BondUID:
+                self.DisemBond()
+                self.EmBondRandomly()
+            elif player.GetUID() == self.OurumovUID:
+                self.DisemOurumov()
+                self.EmOurumovRandomly()
 
     def OnPlayerSpawn( self, player ):
-        if player.GetUID() == self.BondUID or player.GetUID() == self.OurumovUID:
-            self.GiveEquipment( player )
-            player.SetSpeedMultiplier( 1.0 )
-        else:
-            # Costume prevention
-            if player.GetPlayerModel() == self.BondCostume:
-                player.SetPlayerModel( self.MI6DefaultCostume, 0 )
-            elif player.GetPlayerModel() == self.OurumovCostume:
-                player.SetPlayerModel( self.JanusDefaultCostume, 0 )
+        if self.RoundActive:
+            if player.GetUID() == self.BondUID or player.GetUID() == self.OurumovUID:
+                self.GiveEquipment( player )
+                player.SetSpeedMultiplier( 1.0 )
+            else:
+                # Costume prevention
+                if player.GetPlayerModel() == self.BondCostume:
+                    player.SetPlayerModel( self.MI6DefaultCostume, 0 )
+                elif player.GetPlayerModel() == self.OurumovCostume:
+                    player.SetPlayerModel( self.JanusDefaultCostume, 0 )
 
-            self.GivePlayerWeapons( player )
-            player.SetSpeedMultiplier( 1.0 )
-            player.SetScoreBoardColor( GEGlobal.SB_COLOR_NORMAL )
-            # Show the bodyguard's help
-            if not self.WaitingForPlayers and not self.warmupTimer.IsInWarmup() and not self.pltracker.GetValue( player, self.TR_GUARDHELP ):
-                if player.GetTeamNumber() == GEGlobal.TEAM_MI6:
-                    GEUtil.PopupMessage( player, "Guard's Objective", "You are James Bond's bodyguard. Protect him from physical harm." )
-                    GEUtil.PopupMessage( player, "#GES_GPH_RADAR", "James Bond = Blue Star" )
-                    self.pltracker.SetValue( player, self.TR_GUARDHELP, True )
-                elif player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
-                    GEUtil.PopupMessage( player, "Guard's Objective", "You are General Ourumov's bodyguard. Protect him from physical harm." )
-                    GEUtil.PopupMessage( player, "#GES_GPH_RADAR", "General Ourumov = Red Star" )
-                    self.pltracker.SetValue( player, self.TR_GUARDHELP, True )
+                self.GivePlayerWeapons( player )
+                player.SetSpeedMultiplier( 1.0 )
+                player.SetScoreBoardColor( GEGlobal.SB_COLOR_NORMAL )
+                # Show the bodyguard's help
+                if not self.WaitingForPlayers and not self.warmupTimer.IsInWarmup() and not self.pltracker.GetValue( player, self.TR_GUARDHELP ):
+                    if player.GetTeamNumber() == GEGlobal.TEAM_MI6:
+                        GEUtil.PopupMessage( player, "Guard's Objective", "You are James Bond's bodyguard. Protect him from physical harm." )
+                        GEUtil.PopupMessage( player, "#GES_GPH_RADAR", "James Bond = Blue Star" )
+                        self.pltracker.SetValue( player, self.TR_GUARDHELP, True )
+                    elif player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
+                        GEUtil.PopupMessage( player, "Guard's Objective", "You are General Ourumov's bodyguard. Protect him from physical harm." )
+                        GEUtil.PopupMessage( player, "#GES_GPH_RADAR", "General Ourumov = Red Star" )
+                        self.pltracker.SetValue( player, self.TR_GUARDHELP, True )
 
         if player.GetTeamNumber() != GEGlobal.TEAM_SPECTATOR:
             self.pltracker.SetValue( player, self.TR_SPAWNED, True )
@@ -258,7 +260,7 @@ class AgentUnderFire( GEScenario ):
         return True
 
     def OnPlayerKilled( self, victim, killer, weapon ):
-        if self.EndRound or not victim:
+        if not self.RoundActive or not victim:
             return
 
         if victim == self.BondUID or victim == self.OurumovUID:
@@ -359,70 +361,71 @@ class AgentUnderFire( GEScenario ):
                     GERules.EndRound( False )
             return
 
-        # Bond Adrenaline
-        if self.BondUID != 0:
-            player = GEPlayer.ToMPPlayer( self.BondUID )
-            if player is not None and self.pltracker.GetValue( player, self.TR_ADRENALINE ):
-                self.BondAdrenalineTimer -= 1
-                GEUtil.UpdateHudProgressBar( player, 0, self.BondAdrenalineTimer )
-                if self.BondAdrenalineTimer == 0:
-                    player.SetSpeedMultiplier( 1.0 )
-                    self.pltracker.SetValue( player, self.TR_ADRENALINE, False )
+        if self.RoundActive:
+            # Bond Adrenaline
+            if self.BondUID != 0:
+                player = GEPlayer.ToMPPlayer( self.BondUID )
+                if player is not None and self.pltracker.GetValue( player, self.TR_ADRENALINE ):
+                    self.BondAdrenalineTimer -= 1
+                    GEUtil.UpdateHudProgressBar( player, 0, self.BondAdrenalineTimer )
+                    if self.BondAdrenalineTimer == 0:
+                        player.SetSpeedMultiplier( 1.0 )
+                        self.pltracker.SetValue( player, self.TR_ADRENALINE, False )
 
-        # Ourumov Adrenaline
-        if self.OurumovUID != 0:
-            player = GEPlayer.ToMPPlayer( self.OurumovUID )
-            if player is not None and self.pltracker.GetValue( player, self.TR_ADRENALINE ):
-                self.OurumovAdrenalineTimer -= 1
-                GEUtil.UpdateHudProgressBar( player, 1, self.OurumovAdrenalineTimer )
-                if self.OurumovAdrenalineTimer == 0:
-                    player.SetSpeedMultiplier( 1.0 )
-                    self.pltracker.SetValue( player, self.TR_ADRENALINE, False )
+            # Ourumov Adrenaline
+            if self.OurumovUID != 0:
+                player = GEPlayer.ToMPPlayer( self.OurumovUID )
+                if player is not None and self.pltracker.GetValue( player, self.TR_ADRENALINE ):
+                    self.OurumovAdrenalineTimer -= 1
+                    GEUtil.UpdateHudProgressBar( player, 1, self.OurumovAdrenalineTimer )
+                    if self.OurumovAdrenalineTimer == 0:
+                        player.SetSpeedMultiplier( 1.0 )
+                        self.pltracker.SetValue( player, self.TR_ADRENALINE, False )
 
-        # Check to see if the round is over!
-        if GERules.IsTeamplay() and not self.EndRound:
-            iMI6Players = []
-            iJanusPlayers = []
+            # Check to see if the round is over!
+            if GERules.IsTeamplay() and not self.EndRound:
+                iMI6Players = []
+                iJanusPlayers = []
 
-            for player in GetPlayers():
-                if self.IsInPlay( player ):
-                    if player.GetTeamNumber() == GEGlobal.TEAM_MI6:
-                        iMI6Players.append( player )
-                    elif player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
-                        iJanusPlayers.append( player )
+                for player in GetPlayers():
+                    if self.IsInPlay( player ):
+                        if player.GetTeamNumber() == GEGlobal.TEAM_MI6:
+                            iMI6Players.append( player )
+                        elif player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
+                            iJanusPlayers.append( player )
 
-            numMI6Players = len( iMI6Players )
-            numJanusPlayers = len( iJanusPlayers )
+                numMI6Players = len( iMI6Players )
+                numJanusPlayers = len( iJanusPlayers )
 
-            # The VIPs cannot be chosen
-            if numMI6Players == 0 and numJanusPlayers == 0:
-                GEUtil.HudMessage( None, "Stalemate", -1, -1, self.HudShout, 2.0 )
-                self.EndRound = True
-                self.EndRoundTimer = self.EndRoundTime
-            # MI6's VIP cannot be chosen
-            elif numMI6Players == 0 and numJanusPlayers > 0:
-                GEUtil.HudMessage( None, "MI6 concedes.", -1, -1, self.HudShout, 2.0 )
-                janus = GERules.GetTeam( GEGlobal.TEAM_JANUS )
-                janus.AddRoundScore( 5 )
-                GERules.SetTeamWinner( janus )
-                self.EndRound = True
-                self.EndRoundTimer = self.EndRoundTime
-            # Janus' VIP cannot be chosen
-            elif numMI6Players > 0 and numJanusPlayers == 0:
-                GEUtil.HudMessage( None, "Janus concedes.", -1, -1, self.HudShout, 2.0 )
-                mi6 = GERules.GetTeam( GEGlobal.TEAM_MI6 )
-                mi6.AddRoundScore( 5 )
-                GERules.SetTeamWinner( mi6 )
-                self.EndRound = True
-                self.EndRoundTimer = self.EndRoundTime
+                # The VIPs cannot be chosen
+                if numMI6Players == 0 and numJanusPlayers == 0:
+                    GEUtil.HudMessage( None, "Stalemate", -1, -1, self.HudShout, 2.0 )
+                    self.EndRound = True
+                    self.EndRoundTimer = self.EndRoundTime
+                # MI6's VIP cannot be chosen
+                elif numMI6Players == 0 and numJanusPlayers > 0:
+                    GEUtil.HudMessage( None, "MI6 concedes.", -1, -1, self.HudShout, 2.0 )
+                    janus = GERules.GetTeam( GEGlobal.TEAM_JANUS )
+                    janus.AddRoundScore( 5 )
+                    GERules.SetTeamWinner( janus )
+                    self.EndRound = True
+                    self.EndRoundTimer = self.EndRoundTime
+                # Janus' VIP cannot be chosen
+                elif numMI6Players > 0 and numJanusPlayers == 0:
+                    GEUtil.HudMessage( None, "Janus concedes.", -1, -1, self.HudShout, 2.0 )
+                    mi6 = GERules.GetTeam( GEGlobal.TEAM_MI6 )
+                    mi6.AddRoundScore( 5 )
+                    GERules.SetTeamWinner( mi6 )
+                    self.EndRound = True
+                    self.EndRoundTimer = self.EndRoundTime
 
-        # End Round Timer
-        if self.EndRoundTimer > 0:
-            self.EndRoundTimer -= 1
-            if self.EndRoundTimer == 0:
-                if not self.HasEnded:
-                    self.HasEnded = True
-                    GERules.EndRound()
+            # End Round Timer
+            if self.EndRoundTimer > 0:
+                self.EndRoundTimer -= 1
+                if self.EndRoundTimer == 0:
+                    if not self.HasEnded:
+                        self.HasEnded = True
+                        GERules.EndRound()
 
     def CanPlayerRespawn( self, player ):
         if self.pltracker.GetValue( player, self.TR_ELIMINATED ):
@@ -440,69 +443,69 @@ class AgentUnderFire( GEScenario ):
         return True
 
     def CanPlayerHaveItem( self, player, item ):
-        weapon = GEWeapon.ToGEWeapon( item )
-        if weapon:
-            name = weapon.GetClassname().lower()
+        if self.RoundActive:
+            weapon = GEWeapon.ToGEWeapon( item )
+            if weapon:
+                name = weapon.GetClassname().lower()
 
-            if player.GetUID() == self.BondUID or player.GetUID() == self.OurumovUID:
-                if name == "weapon_shotgun" or name == "weapon_knife" or name == "weapon_slappers":
-                    return True
-            elif player.GetTeamNumber() == GEGlobal.TEAM_MI6:
-                lvl = self.MI6Level
-                if name == mi6WeaponList[lvl][0] or name == "weapon_knife" or name == "weapon_slappers":
-                    return True
-            elif player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
-                lvl = self.JanusLevel
-                if name == janusWeaponList[lvl][0] or name == "weapon_knife" or name == "weapon_slappers":
-                    return True
+                if player.GetUID() == self.BondUID or player.GetUID() == self.OurumovUID:
+                    if name == "weapon_shotgun" or name == "weapon_knife" or name == "weapon_slappers":
+                        return True
+                elif player.GetTeamNumber() == GEGlobal.TEAM_MI6:
+                    lvl = self.MI6Level
+                    if name == mi6WeaponList[lvl][0] or name == "weapon_knife" or name == "weapon_slappers":
+                        return True
+                elif player.GetTeamNumber() == GEGlobal.TEAM_JANUS:
+                    lvl = self.JanusLevel
+                    if name == janusWeaponList[lvl][0] or name == "weapon_knife" or name == "weapon_slappers":
+                        return True
 
-            return False
-
+                return False
         return True
 
     def OnPlayerSay( self, player, text ):
-        text = text.lower()
+        if self.RoundActive:
+            text = text.lower()
 
-        if text == "!level":
-            self.PrintCurLevel( player )
-            return True
-        elif text == "!weapons":
-            self.PrintWeapons( player )
-            return True
-        elif text == "!voodoo":
-            if self.Adrenaline:
-                if player.GetUID() == self.BondUID:
-                    if self.BondAdrenalineTimer < self.BondAdrenalineTimerCopy:
-                        GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lYour adrenaline shot is depleted." )
-                    elif not self.RoundActive:
-                        GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lThe round is inactive." )
-                    else:
-                        player.SetSpeedMultiplier( 1.5 )
-                        self.pltracker.SetValue( player, self.TR_ADRENALINE, True )
-                        GEUtil.ClientPrint( None, GEGlobal.HUD_PRINTTALK, "^iJames Bond ^1injected an adrenaline shot!" )
-                        GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Grab_Enemy" )
-                    return True
-                elif player.GetUID() == self.OurumovUID:
-                    if self.OurumovAdrenalineTimer < self.OurumovAdrenalineTimerCopy:
-                        GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lYour adrenaline shot is depleted." )
-                    elif not self.RoundActive:
-                        GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lThe round is inactive." )
-                    else:
-                        player.SetSpeedMultiplier( 1.5 )
-                        self.pltracker.SetValue( player, self.TR_ADRENALINE, True )
-                        GEUtil.ClientPrint( None, GEGlobal.HUD_PRINTTALK, "^rGeneral Ourumov ^1injected an adrenaline shot!" )
-                        GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Grab_Enemy" )
-                    return True
-                else:
-                    GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lYou are not the VIP." )
-                    return True
-            elif not self.Adrenaline:
-                if player.GetUID() == self.BondUID or player.GetUID() == self.OurumovUID:
-                    GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lAdrenaline is disabled." )
-                else:
-                    GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lYou are not the VIP." )
+            if text == "!level":
+                self.PrintCurLevel( player )
                 return True
-
+            elif text == "!weapons":
+                self.PrintWeapons( player )
+                return True
+            elif text == "!voodoo":
+                if self.Adrenaline:
+                    if player.GetUID() == self.BondUID:
+                        if self.BondAdrenalineTimer < self.BondAdrenalineTimerCopy:
+                            GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lYour adrenaline shot is depleted." )
+                        elif not self.RoundActive:
+                            GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lThe round is inactive." )
+                        else:
+                            player.SetSpeedMultiplier( 1.5 )
+                            self.pltracker.SetValue( player, self.TR_ADRENALINE, True )
+                            GEUtil.ClientPrint( None, GEGlobal.HUD_PRINTTALK, "^iJames Bond ^1injected an adrenaline shot!" )
+                            GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Grab_Enemy" )
+                        return True
+                    elif player.GetUID() == self.OurumovUID:
+                        if self.OurumovAdrenalineTimer < self.OurumovAdrenalineTimerCopy:
+                            GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lYour adrenaline shot is depleted." )
+                        elif not self.RoundActive:
+                            GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lThe round is inactive." )
+                        else:
+                            player.SetSpeedMultiplier( 1.5 )
+                            self.pltracker.SetValue( player, self.TR_ADRENALINE, True )
+                            GEUtil.ClientPrint( None, GEGlobal.HUD_PRINTTALK, "^rGeneral Ourumov ^1injected an adrenaline shot!" )
+                            GEUtil.PlaySoundToPlayer( player, "GEGamePlay.Token_Grab_Enemy" )
+                        return True
+                    else:
+                        GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lYou are not the VIP." )
+                        return True
+                elif not self.Adrenaline:
+                    if player.GetUID() == self.BondUID or player.GetUID() == self.OurumovUID:
+                        GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lAdrenaline is disabled." )
+                    else:
+                        GEUtil.ClientPrint( player, GEGlobal.HUD_PRINTTALK, "^lYou are not the VIP." )
+                    return True
         return False
 
     def CanRoundEnd( self ):
