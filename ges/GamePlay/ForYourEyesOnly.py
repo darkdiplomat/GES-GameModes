@@ -1,6 +1,6 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # FOR YOUR EYES ONLY
-# Version 1.2.0
+# Version 1.2.1
 # Originally by: WNxVirtualMark
 # Updated to GE:S v5.0 (API 1.2.0) by: DarkDiplomat
 #
@@ -111,7 +111,6 @@ class ForYourEyesOnly(GEScenario):
         super(ForYourEyesOnly, self).OnUnloadGamePlay()
         self.warmupTimer = None
         self.pltracker = None
-        self.warmupTimer.Reset()
 
     def OnCVarChanged(self, name, oldvalue, newvalue):
         if name == "fyeo_case_carrier_elimination":
