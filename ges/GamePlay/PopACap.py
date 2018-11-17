@@ -146,7 +146,7 @@ class PopACap(GEScenario):
             elif GEUtil.GetTime() > self.PLAYER_WAIT_TICKER:
                 need = 2 - GERules.GetNumActivePlayers()
                 GEUtil.HudMessage(None, "#GES_GP_WAITING", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5, 1)
-                GEUtil.HudMessage(None, "Need %i more players" % need, -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5, 1)
+                GEUtil.HudMessage(None, "Need %i more players" % need, -1, -1.3, GEUtil.Color(255, 255, 255, 255), 2.5, 2)
                 self.PLAYER_WAIT_TICKER = GEUtil.GetTime() + 12.5
         if not self.waitingForPlayers and GERules.GetNumActivePlayers() < 2:
             self.waitingForPlayers = True
