@@ -60,13 +60,15 @@ class Thunderball(GEScenario):
                 if Thunderball.PLTRACKER[ply][TB_CARRIER]:
                     plys.append(ply)
 
-            for others in Thunderball.PLTRACKER.GetPlayers():
-                if Thunderball.PLTRACKER[others][TB_PREV]:
-                    Thunderball.PLTRACKER[others][TB_KNOCKEDOUT] = False
-                    Thunderball.PLTRACKER[others][TB_PREV] = False
-                    others.ChangeTeam(Glb.TEAM_NONE, True)
-                    others.ForceRespawn()
-                    GEUtil.PostDeathMessage("%s ^1has revived!" % others.GetCleanPlayerName())
+            for reviving in Thunderball.PLTRACKER.GetPlayers():
+                if Thunderball.PLTRACKER[reviving][TB_PREV]:
+                    Thunderball.PLTRACKER[reviving][TB_KNOCKEDOUT] = False
+                    Thunderball.PLTRACKER[reviving][TB_PREV] = False
+                    # set their speed multiplier back to normal
+                    reviving.SetSpeedMultiplier(1.0)
+                    reviving.ChangeTeam(Glb.TEAM_NONE, True)
+                    reviving.ForceRespawn()
+                    GEUtil.PostDeathMessage("%s ^1has revived!" % reviving.GetCleanPlayerName())
 
             if len(plys) > 0:
                 for player in plys:
