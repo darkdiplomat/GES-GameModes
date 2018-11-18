@@ -73,11 +73,11 @@ class PopACap(GEScenario):
         GEUtil.PrecacheSound("GEGamePlay.Level_Down")  # sound for becoming the victim
 
         self.CreateCVar("pac_reduced_damage", "1",
-                        "Reduces the damage to non-victim players by 90% (0 to disable, 1 to enable)")
+                        "Reduces the damage to non-victim players by 99% (0 to disable, 1 to enable)")
         self.CreateCVar("pac_survive_time", "30",
                         "The amount of time in seconds the victim should survive before being awarded a point "
                         "(default=30, range 5 - 60)")
-        self.CreateCVar("pac_victim_scoring", "0",
+        self.CreateCVar("pac_victim_scoring", "1",
                         "Enables the victim to score (all kills score) (1 to enable, 0 to disable)")
         self.CreateCVar("pac_classic_mode", "0",
                         "Enables the original Perfect Dark Settings (ie: 1 minute survive timer, normal damage, and "
@@ -181,7 +181,7 @@ class PopACap(GEScenario):
             GERules.GetRadar().DropRadarContact(victim)
             victim.SetScoreBoardColor(Glb.SB_COLOR_NORMAL)
             self.choosenewvictim()
-        elif self.victimScores and not self.classicMode and killer.UID() == self.VICTIM:
+        if self.victimScores and not self.classicMode and killer.GetUID() == self.VICTIM:
             # Victim scoring is enabled
             GEScenario.OnPlayerKilled(self, victim, killer, weapon)
 
@@ -203,15 +203,15 @@ class PopACap(GEScenario):
         return True
 
     def CalculateCustomDamage(self, victim, info, health, armor):
-        # if reduced non-victim damage is enable, reduce damage by 90%
+        # if reduced non-victim damage is enable, reduce damage by 99%
         if self.reduceDamage and not self.classicMode:
             killer = GEPlayer.ToMPPlayer(info.GetAttacker())
             if killer.GetUID() == self.VICTIM:
                 return health, armor
             if victim.GetUID() != self.VICTIM:
                 if killer is not None:
-                    armor -= armor * 0.9
-                    health -= health * 0.9
+                    armor -= armor * 0.99
+                    health -= health * 0.99
                     return health, armor
         return health, armor
 
@@ -224,6 +224,10 @@ class PopACap(GEScenario):
                     and player.GetUID() != PopACap.PRV_VIC1\
                     and player.GetUID() != PopACap.PRV_VIC2:
                 iplayers.append(player)
+
+        if len(iplayers) == 0:
+            # No victim available
+            GERules.EndRound()
 
         numplayers = len(iplayers)
         i = random.randint(1, numplayers) - 1
@@ -246,6 +250,10 @@ class PopACap(GEScenario):
         GEUtil.HudMessage(Glb.TEAM_OBS, "%s is the victim" % self.scrubcolors(newvictim.GetCleanPlayerName()),
                           -1, 0.69, GET_VICTIM_COLOR, 5.0, 6)
         self.capSurviveTimer.Start(self.surviveTime, True)
+        if GERules.GetRadar() is None:
+            # Round of bots which no player left
+            return
+
         GERules.GetRadar().AddRadarContact(newvictim, Glb.RADAR_TYPE_PLAYER, True, "sprites/hud/radar/xsm")
         GERules.GetRadar().SetupObjective(newvictim, Glb.TEAM_NONE, "", "VICTIM", CAP_OBJECTIVE, 0)
         newvictim.SetScoreBoardColor(Glb.SB_COLOR_GOLD)
