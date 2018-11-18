@@ -1,6 +1,6 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # FOR YOUR EYES ONLY
-# Version 1.2.1
+# Version 1.3
 # Originally by: WNxVirtualMark
 # Updated to GE:S v5.0 (API 1.2.0) by: DarkDiplomat
 #
@@ -52,6 +52,7 @@ class ForYourEyesOnly(GEScenario):
         # CVars
         self.allScore = True
         self.caseEliminate = True
+        self.eliminationMode = False
 
     def GetPrintName(self):
         return "For Your Eyes Only"
@@ -101,6 +102,10 @@ class ForYourEyesOnly(GEScenario):
                         "Allows the briefcase holder to be eliminated if killed (0 to disable, 1 to enable)")
         self.CreateCVar("fyeo_all_score", "1",
                         "Allows all players to score points for kills (0 to disable, 1 to enable)")
+        self.CreateCVar("fyeo_elimination", "0",
+                        "Enables the old elimination style of gameplay, "
+                        "disabling bars the players from getting the case for the rest of the match "
+                        "(0 to disable, 1 to enable")
 
         # Make sure we don't start out in wait time or have a warm-up if we changed game play mid-match
         if GEMPGameRules.GetNumActivePlayers() >= 2:
@@ -117,6 +122,8 @@ class ForYourEyesOnly(GEScenario):
             self.caseEliminate = int(newvalue) >= 1
         elif name == "fyeo_all_score":
             self.allScore = int(newvalue) >= 1
+        elif name == "fyeo_elimination":
+            self.eliminationMode = int(newvalue) >= 1
 
     def OnPlayerConnect(self, player):
         self.pltracker[player][self.TR_SPAWNED] = False
@@ -192,12 +199,16 @@ class ForYourEyesOnly(GEScenario):
         # If someone is killed by the person with the case, they are eliminated.
         if killer.GetUID == self.CaseOwnerID:
             GEMPGameRules.LockRound()
-            GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", victim.GetCleanPlayerName()))
             GEUtil.EmitGameplayEvent("fyeo_eliminated", str(victim.GetUID()), str(killer.GetUID() if killer else ""),
                                      "", "", True)
-            GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
-            GEUtil.PlaySoundToPlayer(killer, "GEGamePlay.Token_Chime")
-            GEUtil.PlaySoundToPlayer(victim, "GEGamePlay.Token_Capture_Enemy")
+            if self.eliminationMode:
+                GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", victim.GetCleanPlayerName()))
+                GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
+                GEUtil.PlaySoundToPlayer(killer, "GEGamePlay.Token_Chime")
+                GEUtil.PlaySoundToPlayer(victim, "GEGamePlay.Token_Capture_Enemy")
+            else:
+                GEUtil.PopupMessage(victim, "Not For Your Eyes", "You have been barred from picking up the case")
+                GEUtil.PostDeathMessage("^r%s ^rhas lost their security clearance..." % victim.GetCleanPlayerName())
 
             # Officially eliminate the player
             self.pltracker[victim][self.TR_ELIMINATED] = True
@@ -205,21 +216,27 @@ class ForYourEyesOnly(GEScenario):
             self.InitializePlayerBounty()
             # Update the bounty
             self.UpdatePlayerBounty(victim)
+            # Case owner gets an extra point
+            killer.AddRoundScore(1)
 
         # Death by world
         if not killer:
             if victim.GetUID == self.CaseOwnerID:
+                GEMPGameRules.LockRound()
                 GEUtil.EmitGameplayEvent("fyeo_suicide", str(victim.GetUID()), "", "", "", True)
                 GEUtil.PostDeathMessage("^rThe Briefcase holder committed suicide.")
                 GEUtil.PlaySoundToPlayer(victim, "GEGamePlay.Token_Capture_Enemy")
+                GEUtil.EmitGameplayEvent("fyeo_eliminated", str(victim.GetUID()),
+                                         str(killer.GetUID if killer else ""), "", "", True)
 
                 # Eliminate player on suicide if they are the case holder,
                 # unless game is currently "Waiting For Players"
-                GEMPGameRules.LockRound()
-                GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", victim.GetCleanPlayerName()))
-                GEUtil.EmitGameplayEvent("fyeo_eliminated", str(victim.GetUID()),
-                                         str(killer.GetUID if killer else ""), "", "", True)
-                GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
+                if self.eliminationMode:
+                    GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", victim.GetCleanPlayerName()))
+                    GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
+                else:
+                    GEUtil.PopupMessage(victim, "Not For Your Eyes", "You have been barred from picking up the case")
+                    GEUtil.PostDeathMessage("^r%s ^rhas lost their security clearance..." % victim.GetCleanPlayerName())
 
                 # Officially eliminate the player
                 self.pltracker[victim][self.TR_ELIMINATED] = True
@@ -237,9 +254,9 @@ class ForYourEyesOnly(GEScenario):
             if killer.GetUID == self.CaseOwnerID:
                 # Case holder scores for every kill he or she gets, double if its with the Briefcase
                 if weapon.GetClassname().lower() == "token_deathmatch":
-                    killer.IncrementScore(1)  # Add an extra point
-                # if death match scoring isn't enabled, give the killer a point
-                if not self.allScore:
+                    killer.IncrementScore(2)  # Add an extra point
+                else:
+                    # give the case owner extra points for killing
                     killer.IncrementScore(1)
 
                 # If case holder gets a kill, he/she regains a bar of health (or armor, if health is full).
@@ -260,12 +277,17 @@ class ForYourEyesOnly(GEScenario):
                 GEUtil.EmitGameplayEvent("fyeo_caseholder_killed", str(victim.GetUID), str(killer.GetUID))
                 GEUtil.PostDeathMessage("^1"+killer.GetPlayerName()+" ^4killed the Briefcase holder.")
                 GEUtil.PlaySoundToPlayer(victim, "GEGamePlay.Token_Drop_Friend")
+                GEMPGameRules.LockRound()
+                GEUtil.EmitGameplayEvent("fyeo_eliminated", str(victim.GetUserID()),
+                                         str(killer.GetUserID() if killer else ""), "", "", True)
                 if self.caseEliminate:
-                    GEMPGameRules.LockRound()
-                    GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", victim.GetCleanPlayerName()))
-                    GEUtil.EmitGameplayEvent("fyeo_eliminated", str(victim.GetUserID()),
-                                             str(killer.GetUserID() if killer else ""), "", "", True)
-                    GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
+                    if self.eliminationMode:
+                        GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", victim.GetCleanPlayerName()))
+                        GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
+                    else:
+                        GEUtil.PopupMessage(victim, "Not For Your Eyes",
+                                            "You have been barred from picking up the case")
+                        GEUtil.PostDeathMessage("^r%s ^rhas lost their security clearance..." % victim.GetCleanPlayerName())
                     # Officially eliminate the player
                     self.pltracker[victim][self.TR_ELIMINATED] = True
                     # Initialize the bounty (if we need to)
@@ -304,13 +326,13 @@ class ForYourEyesOnly(GEScenario):
             GEMPGameRules.EndRound()
         if numPlayers == 1:
             # Make last remaining player the winner, and double his or her score.
-            GEMPGameRules.SetPlayerWinner(iPlayers[0])
-            iPlayers[0].IncrementScore(iPlayers[0].GetScore())
+            # GEMPGameRules.SetPlayerWinner(iPlayers[0])
+            # iPlayers[0].IncrementScore(iPlayers[0].GetScore())
             GEMPGameRules.EndRound()
 
     def CanPlayerRespawn(self, player):
         if GEMPGameRules.IsRoundLocked():
-            if self.pltracker[player][self.TR_ELIMINATED]:
+            if self.pltracker[player][self.TR_ELIMINATED] and self.eliminationMode:
                 player.SetScoreBoardColor(GEGlobal.SB_COLOR_ELIMINATED)
                 return False
 
@@ -319,8 +341,8 @@ class ForYourEyesOnly(GEScenario):
 
     def InitializePlayerBounty(self):
         if self.dmBounty == 0:
-            self.dmBounty = GEMPGameRules.GetNumInRoundPlayers() - 1
-            # Subtract one because we don't count the local player as a "foe"
+            deduct = 0 if self.eliminationMode else 1
+            self.dmBounty = GEMPGameRules.GetNumInRoundPlayers() - deduct
             GEUtil.InitHudProgressBar(GEGlobal.TEAM_NONE, 0, "#GES_GP_FOES", GEGlobal.HUDPB_SHOWVALUE,
                                       self.dmBounty, -1, 0.02, 0, 10, GEUtil.Color(170, 170, 170, 220),
                                       self.dmBounty)
@@ -384,3 +406,8 @@ class ForYourEyesOnly(GEScenario):
         GEMPGameRules.GetRadar().DropRadarContact(token)
         GEMPGameRules.GetRadar().DropRadarContact(token.GetOwner())
         self.CaseOwnerID = None
+
+    def CanPlayerHaveItem(self, player, item):
+        if self.pltracker[player][self.TR_ELIMINATED]:
+            return not item.GetClassname().lower() == "token_deathmatch"
+        return True
