@@ -3,3 +3,5 @@ Revision History:
 1.0.1 (4/25/11): Removed line breaks from "Buffs" help popup.  - WNxVirtualMark
 1.1.0 (11/4/18): Updated to GE:S v5.0, made adjustments to the code - DarkDiplomat
 1.2.0 (11/11/18): Added settings to enable death match scoring and eliminating the case holder on death
+1.3.0 (11/18/18): Option to play non-elimination (instead barring players from picking up the case)
+1.3.1 (12/4/18): Fixed bug with revoke message displaying every death

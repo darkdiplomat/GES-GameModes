@@ -1,6 +1,6 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # FOR YOUR EYES ONLY
-# Version 1.3
+# Version 1.3.1
 # Originally by: WNxVirtualMark
 # Updated to GE:S v5.0 (API 1.2.0) by: DarkDiplomat
 #
@@ -180,6 +180,9 @@ class ForYourEyesOnly(GEScenario):
                                         "\nLast agent standing wins the round!")
             GEUtil.PopupMessage(player, "#GES_GPH_RADAR",
                                         "Dropped Briefcase = Blue Square \nBriefcase Holder = Blue Dot")
+            GEUtil.ClientPrint(player, GEGlobal.HUD_PRINTTALK,
+                               "^yIf you experience any bugs or have suggestions, "
+                               "please report them on GitHub. https://git.io/fpih1")
 
     def OnPlayerKilled(self, victim, killer, weapon):
         if not victim:
@@ -206,7 +209,7 @@ class ForYourEyesOnly(GEScenario):
                 GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
                 GEUtil.PlaySoundToPlayer(killer, "GEGamePlay.Token_Chime")
                 GEUtil.PlaySoundToPlayer(victim, "GEGamePlay.Token_Capture_Enemy")
-            else:
+            elif not self.pltracker[victim][self.TR.ELIMINATED]:  # Don't display message if already revoked
                 GEUtil.PopupMessage(victim, "Not For Your Eyes", "You have been barred from picking up the case")
                 GEUtil.PostDeathMessage("^r%s ^rhas lost their security clearance..." % victim.GetCleanPlayerName())
 
@@ -234,7 +237,7 @@ class ForYourEyesOnly(GEScenario):
                 if self.eliminationMode:
                     GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", victim.GetCleanPlayerName()))
                     GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
-                else:
+                elif not self.pltracker[victim][self.TR.ELIMINATED]:  # Don't display message if already revoked
                     GEUtil.PopupMessage(victim, "Not For Your Eyes", "You have been barred from picking up the case")
                     GEUtil.PostDeathMessage("^r%s ^rhas lost their security clearance..." % victim.GetCleanPlayerName())
 
@@ -284,10 +287,11 @@ class ForYourEyesOnly(GEScenario):
                     if self.eliminationMode:
                         GEUtil.PostDeathMessage(_("#GES_GP_YOLT_ELIMINATED", victim.GetCleanPlayerName()))
                         GEUtil.PopupMessage(victim, "#GES_GPH_ELIMINATED_TITLE", "#GES_GPH_ELIMINATED")
-                    else:
+                    elif not self.pltracker[victim][self.TR.ELIMINATED]:  # Don't display message if already revoked
                         GEUtil.PopupMessage(victim, "Not For Your Eyes",
                                             "You have been barred from picking up the case")
-                        GEUtil.PostDeathMessage("^r%s ^rhas lost their security clearance..." % victim.GetCleanPlayerName())
+                        GEUtil.PostDeathMessage("^r%s ^rhas lost their security clearance..."
+                                                % victim.GetCleanPlayerName())
                     # Officially eliminate the player
                     self.pltracker[victim][self.TR_ELIMINATED] = True
                     # Initialize the bounty (if we need to)
