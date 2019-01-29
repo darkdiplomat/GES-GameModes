@@ -72,8 +72,8 @@ Thunderball, such as, increased speed and taking less damage (like an
 adrenaline boost in the panic of being the Thunderball carrier)
 
 ## [WarpModule](../master/ges/GamePlay/WarpModule.py)
-Created by: EntropySoldier
+Created by: Entropy-Soldier  
 Updated by: DarkDiplomat
 
-**NOTE: REQUIRES COMPATIBLE MAPS TO WORK PROPERLY**  
+**NOTE: REQUIRES COMPATIBLE [MAPS](https://forums.geshl2.com/index.php?topic=7419.msg77440#msg77440) TO WORK PROPERLY**  
 Press the key bound to the command !voodoo to travel through dimensions!  Occasionally you get stuck, get over it.
