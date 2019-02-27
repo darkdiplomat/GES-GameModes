@@ -39,6 +39,14 @@ Briefcase, and your speed will be slightly increased. Second, when
 you eliminate a player, you will regain 1 bar of health (or 1 bar  
 of armor, if health is full).  
 
+## [Gotta Cap'em All](../master/ges/GamePlay/GottaCapEmAll.py)
+Created by: DarkDiplomat  
+Based on concept ideas from Shemp Hamward  
+
+You have to kill every player at least once to win.  
+The first player to kill every other player wins the round.  
+You only score points for unique kills.  
+
 ## [LaunchCode](../master/ges/GamePlay/LaunchCode.py)
 Created by: *unknown*  
 Updated by: DarkDiplomat  
