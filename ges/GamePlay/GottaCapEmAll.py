@@ -65,6 +65,12 @@ class GottaCapEmAll(GEScenario):
     def OnLoadGamePlay(self):
         GERules.AllowRoundTimer(False)
 
+    def OnUnloadGamePlay(self):
+        # Clean up
+        self.targetTracker.clear()
+        self.pltracker = None
+        self.warmupTimer = None
+
     def OnPlayerSay(self, player, text):
         text = text.lower()
 
@@ -74,16 +80,19 @@ class GottaCapEmAll(GEScenario):
             return True
 
     def OnRoundBegin(self):
+        super(GottaCapEmAll, self).OnRoundBegin()
+        if not self.warmupTimer.IsInWarmup() and self.warmupTimer.HadWarmup():
+            return
+
         self.FIRST_KILL = False
-        GERules.ResetAllPlayerDeaths()
-        GERules.ResetAllPlayersScores()
         GERules.LockRound()
 
         initPly = []
         for ply in GetPlayers():
-            self.pltracker.SetValueAll(ply.GetUID(), False)
-            initPly.append(ply)
-            self.targetTracker.setdefault(ply.GetUID(), "")
+            if ply.IsInRound():
+                self.pltracker.SetValueAll(ply.GetUID(), False)
+                initPly.append(ply)
+                self.targetTracker.setdefault(ply.GetUID(), "")
 
         for ply in initPly:
             self.showTargets(ply)
@@ -94,12 +103,14 @@ class GottaCapEmAll(GEScenario):
     def OnPlayerConnect(self, player):
         self.pltracker.SetValueAll(player.GetUID(), False)
         self.pltracker.SetValue(player, player.GetUID(), True)
-        for ply in GetPlayers():
-            if GEPlayer.IsValidPlayerIndex(ply.GetIndex()):
-                GEUtil.RemoveHudProgressBar(ply, player.GetUID())
 
     def OnPlayerDisconnect(self, player):
         self.pltracker.SetValueAll(player.GetUID(), True)
+
+    def CanPlayerChangeTeam(self, player, oldteam, newteam, wasforced):
+        if newteam == Glb.TEAM_SPECTATOR:
+            self.pltracker.SetValueAll(player.GetUID(), True)
+        return True
 
     def OnPlayerKilled(self, victim, killer, weapon):
         if self.waitingForPlayers or self.warmupTimer.IsInWarmup() or GERules.IsIntermission() or not victim:
@@ -125,7 +136,7 @@ class GottaCapEmAll(GEScenario):
             if GERules.GetNumActivePlayers() > 1:
                 self.waitingForPlayers = False
                 if not self.warmupTimer.HadWarmup():
-                    self.warmupTimer.StartWarmup(1, True)
+                    self.warmupTimer.StartWarmup(15, True)
                 else:
                     GERules.EndRound(False)
             elif GEUtil.GetTime() > self.PLAYER_WAIT_TICKER:
@@ -134,8 +145,9 @@ class GottaCapEmAll(GEScenario):
 
     def hasWon(self, killer):
         for ply in GetPlayers():
-            if ply.GetUID() == killer.GetUID():
+            if ply.GetUID() == killer.GetUID() or ply.GetTeamNumber() == Glb.TEAM_SPECTATOR:
                 continue
+
             if not self.pltracker[killer][ply.GetUID()]:
                 return False
         return True
@@ -150,8 +162,8 @@ class GottaCapEmAll(GEScenario):
     def targetsGen(self, player):
         targets = ""
         for ply in GetPlayers():
-            if player == ply:
-                continue  # remove self from targets
+            if player == ply or not ply.IsInRound():
+                continue  # remove self and spectators from targets
             if not self.pltracker[player][ply.GetUID()]:
                 targets += self.nameGen(ply)+"\n"
         targets += "\n"  # extra new line to extend the name list box
