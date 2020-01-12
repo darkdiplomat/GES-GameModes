@@ -69,7 +69,7 @@ survive for a period of time.
 Created by: DarkDiplomat  
 Based loosely on concepts laid out at [GESHL2 Forums](https://forums.geshl2.com/index.php/topic,5573.0.html)
 
-The Thunderball is set to explode every 25 seconds!
+The Thunderball is set to explode at a set interval!
 To start, the Thunderball is given to a random player. The player has to kill an opponent to
 get rid of the Thunderball. If the player is unable to accomplish that they
 are temporarily knocked out and the last player to kill them takes ownership
