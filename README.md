@@ -14,7 +14,7 @@ The first team to kill all of their opposing team's VIPs wins the round.
 Type !level to print your team's current level. Type !weapons to print your team's weapon levels.
 
 ## [Bypass](../master/ges/GamePlay/Bypass.py)
-Created by: *unknown*  
+Created by: Entropy-Soldier  
 Updated by: DarkDiplomat
 
 You are no longer protected by invulnerability! Every bullet counts as a hit in this mode.  
