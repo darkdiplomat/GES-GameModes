@@ -81,7 +81,7 @@ class GottaCapEmAll(GEScenario):
 
     def OnRoundBegin(self):
         super(GottaCapEmAll, self).OnRoundBegin()
-        if not self.warmupTimer.IsInWarmup() and self.warmupTimer.HadWarmup():
+        if self.warmupTimer.IsInWarmup() and not self.warmupTimer.HadWarmup():
             return
 
         self.FIRST_KILL = False
@@ -98,6 +98,9 @@ class GottaCapEmAll(GEScenario):
             self.showTargets(ply)
 
     def OnRoundEnd(self):
+        self.targetTracker.clear()
+        for ply in GetPlayers():  # Clear the target list
+            self.pltracker.SetValueAll(ply.GetUID(), True)
         GERules.UnlockRound()
 
     def OnPlayerConnect(self, player):
@@ -113,15 +116,14 @@ class GottaCapEmAll(GEScenario):
         return True
 
     def OnPlayerKilled(self, victim, killer, weapon):
-        if self.waitingForPlayers or self.warmupTimer.IsInWarmup() or GERules.IsIntermission() or not victim:
-            # Nothing to do but wait...
+        if not victim or GERules.GetNumInRoundPlayers() < 2:  # don't execute logic if there aren't enough players for it.
             return
 
+        self.FIRST_KILL = True
         if not self.pltracker[killer].get(victim.GetUID(), False):
             # Capped a new one
             self.pltracker.SetValue(killer, victim.GetUID(), True)
             killer.AddRoundScore(1)
-            self.FIRST_KILL = True
             self.showTargets(killer)
 
         if self.FIRST_KILL:
