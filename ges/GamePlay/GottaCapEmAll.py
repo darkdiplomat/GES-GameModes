@@ -153,6 +153,7 @@ class GottaCapEmAll(GEScenario):
                 self.PLAYER_WAIT_TICKER = GEUtil.GetTime() + 12.5
 
         if not self.waitingForPlayers and GERules.GetNumActivePlayers() < 2:  # We've lost the players
+            self.waitingForPlayers = True
             GERules.EndRound()
             GERules.UnlockRound()
 
