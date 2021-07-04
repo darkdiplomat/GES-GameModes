@@ -2,7 +2,7 @@
 # Gotta Cap'em All
 # Version 1.0.0 BETA
 # Author: DarkDiplomat
-# Based on an Idea from ShempHamward
+# Based on an Idea from ShempTheNight
 #
 # Synopsis: You have to kill every player at least once to win.
 # The first player to kill every other player wins the round.
@@ -81,21 +81,13 @@ class GottaCapEmAll(GEScenario):
 
     def OnRoundBegin(self):
         super(GottaCapEmAll, self).OnRoundBegin()
-        if self.warmupTimer.IsInWarmup() and not self.warmupTimer.HadWarmup():
+        self.FIRST_KILL = False
+        if self.warmupTimer.IsInWarmup():
+            return
+        if not self.warmupTimer.HadWarmup():
             return
 
-        self.FIRST_KILL = False
         GERules.LockRound()
-
-        initPly = []
-        for ply in GetPlayers():
-            if ply.IsInRound():
-                self.pltracker.SetValueAll(ply.GetUID(), False)
-                initPly.append(ply)
-                self.targetTracker.setdefault(ply.GetUID(), "")
-
-        for ply in initPly:
-            self.showTargets(ply)
 
     def OnRoundEnd(self):
         self.targetTracker.clear()
@@ -111,6 +103,10 @@ class GottaCapEmAll(GEScenario):
         self.pltracker.SetValueAll(player.GetUID(), True)
 
     def CanPlayerChangeTeam(self, player, oldteam, newteam, wasforced):
+        if GERules.IsRoundLocked():
+            if oldteam == Glb.TEAM_SPECTATOR: # Switching from spectator.  But we're only allowed to join the round if it isn't locked.
+                GEUtil.PopupMessage( player, "#GES_GPH_CANTJOIN_TITLE", "#GES_GPH_CANTJOIN" )
+                return False
         if newteam == Glb.TEAM_SPECTATOR:
             self.pltracker.SetValueAll(player.GetUID(), True)
         return True
@@ -119,18 +115,29 @@ class GottaCapEmAll(GEScenario):
         if not victim or GERules.GetNumInRoundPlayers() < 2:  # don't execute logic if there aren't enough players for it.
             return
 
-        self.FIRST_KILL = True
+        if self.warmupTimer.IsInWarmup(): # if in warmup don't run logic
+            return
+
+        if not self.FIRST_KILL:
+            self.FIRST_KILL = True
+            # Build target lists now that a kill is confirmed
+            initPly = []
+            for ply in GetPlayers():
+                if ply.IsInRound():
+                    self.pltracker.SetValueAll(ply.GetUID(), False)
+                    initPly.append(ply)
+                    self.targetTracker.setdefault(ply.GetUID(), "")
+
         if not self.pltracker[killer].get(victim.GetUID(), False):
             # Capped a new one
             self.pltracker.SetValue(killer, victim.GetUID(), True)
             killer.AddRoundScore(1)
             self.showTargets(killer)
 
-        if self.FIRST_KILL:
-            # Check for winner only after a real round has started
-            for ply in GetPlayers():
-                if self.hasWon(ply):
-                    GERules.EndRound()
+        # Check for a winner
+        for ply in GetPlayers():
+            if self.hasWon(ply):
+                GERules.EndRound()
 
     def OnThink(self):
         # Check to see if we can get out of warmup
@@ -144,6 +151,10 @@ class GottaCapEmAll(GEScenario):
             elif GEUtil.GetTime() > self.PLAYER_WAIT_TICKER:
                 GEUtil.HudMessage(None, "#GES_GP_WAITING", -1, -1, GEUtil.Color(255, 255, 255, 255), 2.5, 1)
                 self.PLAYER_WAIT_TICKER = GEUtil.GetTime() + 12.5
+
+        if not self.waitingForPlayers and GERules.GetNumActivePlayers() < 2:  # We've lost the players
+            GERules.EndRound()
+            GERules.UnlockRound()
 
     def hasWon(self, killer):
         for ply in GetPlayers():
@@ -162,6 +173,8 @@ class GottaCapEmAll(GEScenario):
                " (" + str(self.CHARACTER_DICT.get(player.GetPlayerModel())) + ")"
 
     def targetsGen(self, player):
+        if not self.FIRST_KILL:
+            return "Generating list... Stand by..."
         targets = ""
         for ply in GetPlayers():
             if player == ply or not ply.IsInRound():
