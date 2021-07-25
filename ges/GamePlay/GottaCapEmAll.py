@@ -82,12 +82,6 @@ class GottaCapEmAll(GEScenario):
     def OnRoundBegin(self):
         super(GottaCapEmAll, self).OnRoundBegin()
         self.FIRST_KILL = False
-        if self.warmupTimer.IsInWarmup():
-            return
-        if not self.warmupTimer.HadWarmup():
-            return
-
-        GERules.LockRound()
 
     def OnRoundEnd(self):
         self.targetTracker.clear()
@@ -119,6 +113,8 @@ class GottaCapEmAll(GEScenario):
             return
 
         if not self.FIRST_KILL:
+            # Lock the round in now
+            GERules.LockRound()
             self.FIRST_KILL = True
             # Build target lists now that a kill is confirmed
             initPly = []
