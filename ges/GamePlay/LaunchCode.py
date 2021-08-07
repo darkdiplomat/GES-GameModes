@@ -100,6 +100,7 @@ class LaunchCode(GEScenario):
         self.timer_hacking = None
         self.game_roundCount = 0
         self.hacker_hasWeapon = False
+        self.hacker_canArm = False
         self.game_lastTerminalUID = None
         self.game_currTerminalUID = None
         self.hacker_hasTool = False
@@ -178,6 +179,7 @@ class LaunchCode(GEScenario):
         self.CreateCVar("lc_hackerboost", "1", "Allow the hacker to gain an ego-boost")
         self.CreateCVar("lc_hackertool", "1", "Allow the Insta-Hack tool")
         self.CreateCVar("lc_hacktime", "15", "Base number of seconds to hack a terminal")
+        self.CreateCVar("lc_hackercanarm", "1", "Allows the hacker to have a DD44 to protect themselves")
 
     def OnRoundBegin(self):
         GERules.GetRadar().SetForceRadar(True)
@@ -202,7 +204,7 @@ class LaunchCode(GEScenario):
     def OnPlayerSpawn(self, player):
         # Properly arm the hacker
         if self.hacker_playerUID == player.GetUID():
-            self.lc_ArmHacker()
+            self.lc_ArmHacker()  # Give the hacker back their weapon on respawn
             if self.hacker_notice < 3:
                 self.hacker_notice += 1
                 GEUtil.HudMessage(player, "You are the hacker, hack the terminals by standing next to them", -1, -1,
@@ -266,7 +268,6 @@ class LaunchCode(GEScenario):
         elif player.GetUID() == self.hacker_playerUID:
             if self.lc_CanHackerSwitch():
                 self.lc_ChooseHacker()
-                self.lc_ArmHacker()
                 return True
             else:
                 GEUtil.HudMessage(player, "You cannot switch from the hacker!", -1, 0.1, self.COLOR_INFO, 2.0)
@@ -283,7 +284,7 @@ class LaunchCode(GEScenario):
                 return True
             elif name == "weapon_slappers" or name == self.TOOL_CLASSNAME:
                 return True
-            elif name == "weapon_dd44" and not self.hacker_hasWeapon:
+            elif name == "weapon_dd44" and not self.hacker_hasWeapon and self.hacker_canArm:
                 self.hacker_hasWeapon = True
                 return True
 
@@ -351,6 +352,8 @@ class LaunchCode(GEScenario):
     def OnPlayerDisconnect(self, player):
         # If the hacker disconnects we must choose a new one
         if player.GetUID() == self.hacker_playerUID:
+            self.hacker_hasWeapon = False
+            self.hacker_hasTool = False
             self.lc_ChooseHacker(True)
 
     def OnPlayerSay(self, player, text):
@@ -423,7 +426,7 @@ class LaunchCode(GEScenario):
             self.lc_ErrorShout("Hacker assignment attempted before team chosen!")
             return
 
-        # Enumerate the number of eligable players
+        # Enumerate the number of eligible players
         players = self.lc_ListPlayers(self.team_hacker, self.hacker_playerUID)
 
         if self.hacker_playerUID:
@@ -468,6 +471,7 @@ class LaunchCode(GEScenario):
             # Reset notices
             self.hacker_notice = 0
             self.hacker_playerUID = uid
+            self.lc_ArmHacker()
 
     def lc_DerobeHacker(self):
         player = getPlayerFromUID(self.hacker_playerUID)
@@ -478,6 +482,8 @@ class LaunchCode(GEScenario):
             player.GiveDefaultWeapons()
             GERules.GetRadar().DropRadarContact(player)
 
+        self.hacker_hasWeapon = False
+        self.hacker_hasTool = False
         self.hacker_playerUID = None
 
     def lc_ArmHacker(self, onlyAmmo=False):
@@ -486,7 +492,7 @@ class LaunchCode(GEScenario):
             if onlyAmmo:
                 player.GiveAmmo(Glb.AMMO_9MM, 16)
             else:
-                self.hacker_hasWeapon = False
+                self.hacker_hasWeapon = True
                 player.StripAllWeapons()
                 player.GiveNamedWeapon("weapon_slappers", 0)
                 player.GiveNamedWeapon("weapon_dd44", 14)  # DD44 starts w/ 10 bullets: 8|16
