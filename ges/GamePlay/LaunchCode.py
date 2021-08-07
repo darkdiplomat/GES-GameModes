@@ -176,14 +176,23 @@ class LaunchCode(GEScenario):
                                                limit=4, radius=32, location=Glb.SPAWN_PLAYER)
 
         self.CreateCVar("lc_warmup", "30", "Warmup time before the match begins")
-        self.CreateCVar("lc_hackerboost", "1", "Allow the hacker to gain an ego-boost")
+        # TODO: One of those things that seems to have gone unimplemented
+        # self.CreateCVar("lc_hackerboost", "1", "Allow the hacker to gain an ego-boost")
         self.CreateCVar("lc_hackertool", "1", "Allow the Insta-Hack tool")
         self.CreateCVar("lc_hacktime", "15", "Base number of seconds to hack a terminal")
-        self.CreateCVar("lc_hackercanarm", "1", "Allows the hacker to have a DD44 to protect themselves")
+        self.CreateCVar("lc_hackerdefense", "1", "Allows the hacker to have a DD44 to protect themselves")
+        self.CreateCVar("lc_debug", "0", "Enabled/Disables debugging prompts")
 
     def OnRoundBegin(self):
+        self.__debug = GEUtil.GetCVarValue("lc_debug")
+        if self.__debug:
+            GEUtil.ClientPrint(None, Glb.HUD_PRINTTALK, self.TAG + "Debugging Enabled")
+        else:
+            GEUtil.ClientPrint(None, Glb.HUD_PRINTTALK, self.TAG + "Debugging Disabled")
+
         GERules.GetRadar().SetForceRadar(True)
         GERules.ResetAllPlayersScores()
+        self.hacker_canArm = bool(GEUtil.GetCVarValue("lc_hackerdefense"))
         self.game_roundCount += 1
 
         self.lc_DerobeHacker()
@@ -204,7 +213,8 @@ class LaunchCode(GEScenario):
     def OnPlayerSpawn(self, player):
         # Properly arm the hacker
         if self.hacker_playerUID == player.GetUID():
-            self.lc_ArmHacker()  # Give the hacker back their weapon on respawn
+            if self.hacker_canArm:
+                self.lc_ArmHacker(player)  # Give the hacker back their weapon on respawn
             if self.hacker_notice < 3:
                 self.hacker_notice += 1
                 GEUtil.HudMessage(player, "You are the hacker, hack the terminals by standing next to them", -1, -1,
@@ -244,13 +254,14 @@ class LaunchCode(GEScenario):
             return
 
         if player.GetUID() == self.hacker_playerUID:
+            time_hack = float(GEUtil.GetCVarValue("lc_hacktime"))
             if self.timer_hacking.state is Timer.STATE_STOP or self.game_lastTerminalUID != area.GetUID():
-                GEUtil.InitHudProgressBar(None, 1, "Hack Progress:", 1, 10.0, -1, 0.75, 120, 15,
+                GEUtil.InitHudProgressBar(None, 1, "Hack Progress:", 1, time_hack, -1, 0.75, 120, 15,
                                           GEUtil.CColor(220, 220, 220, 240))
 
             self.game_lastTerminalUID = aUID
             self.game_currTerminalUID = aUID
-            self.timer_hacking.Start(10.0)
+            self.timer_hacking.Start(time_hack)
 
     def OnCaptureAreaExited(self, area, player):
         if player.GetUID() == self.hacker_playerUID:
@@ -284,8 +295,7 @@ class LaunchCode(GEScenario):
                 return True
             elif name == "weapon_slappers" or name == self.TOOL_CLASSNAME:
                 return True
-            elif name == "weapon_dd44" and not self.hacker_hasWeapon and self.hacker_canArm:
-                self.hacker_hasWeapon = True
+            elif name == "weapon_dd44" and self.hacker_canArm:
                 return True
 
             return False
@@ -357,17 +367,7 @@ class LaunchCode(GEScenario):
             self.lc_ChooseHacker(True)
 
     def OnPlayerSay(self, player, text):
-        # TODO: Remove me on release
-        if text == "!debug":
-            self.__debug = not self.__debug
-            if self.__debug:
-                GEUtil.ClientPrint(None, Glb.HUD_PRINTTALK, self.TAG + "Debugging Enabled")
-            else:
-                GEUtil.ClientPrint(None, Glb.HUD_PRINTTALK, self.TAG + "Debugging Disabled")
-
-            return True
-
-        elif text == "!voodoo":
+        if text == "!voodoo":
             if player.GetUID() == self.hacker_playerUID and self.hacker_hasTool and self.game_currTerminalUID:
                 self.lc_OnHackCompleted()
                 self.timer_hacking.Stop()
@@ -428,17 +428,16 @@ class LaunchCode(GEScenario):
 
         # Enumerate the number of eligible players
         players = self.lc_ListPlayers(self.team_hacker, self.hacker_playerUID)
-
+        self.lc_DerobeHacker()
         if self.hacker_playerUID:
             if len(players) > 1 and (force or self.lc_CanHackerSwitch()):
                 self.lc_DebugShout("Hacker being switched")
-                self.lc_DerobeHacker()
+
                 self.lc_EnrobeHacker(random.choice(players))
                 self.hacker_switched = True
 
         elif len(players) > 0:
             self.lc_DebugShout("New hacker being selected")
-            self.lc_DerobeHacker()
             self.lc_EnrobeHacker(random.choice(players))
             self.hacker_switched = False
 
@@ -450,8 +449,10 @@ class LaunchCode(GEScenario):
         return False
 
     def lc_CreateHackingTool(self):
-        mgr = GERules.GetTokenMgr()
-        mgr.SetupToken(self.TOOL_CLASSNAME, limit=1, location=Glb.SPAWN_AMMO,
+        # Only create the hacking tool if allowed
+        if bool(GEUtil.GetCVarValue("lc_hackertool")):
+            mgr = GERules.GetTokenMgr()
+            mgr.SetupToken(self.TOOL_CLASSNAME, limit=1, location=Glb.SPAWN_AMMO,
                        allow_switch=True, glow_color=GEUtil.CColor(80, 80, 80, 255), glow_dist=500.0)
 
     def lc_EnrobeHacker(self, uid):
@@ -471,7 +472,8 @@ class LaunchCode(GEScenario):
             # Reset notices
             self.hacker_notice = 0
             self.hacker_playerUID = uid
-            self.lc_ArmHacker()
+            if self.hacker_canArm:
+                self.lc_ArmHacker(player)
 
     def lc_DerobeHacker(self):
         player = getPlayerFromUID(self.hacker_playerUID)
@@ -486,17 +488,12 @@ class LaunchCode(GEScenario):
         self.hacker_hasTool = False
         self.hacker_playerUID = None
 
-    def lc_ArmHacker(self, onlyAmmo=False):
-        player = getPlayerFromUID(self.hacker_playerUID)
+    def lc_ArmHacker(self, player):
         if player is not None:
-            if onlyAmmo:
-                player.GiveAmmo(Glb.AMMO_9MM, 16)
-            else:
-                self.hacker_hasWeapon = True
-                player.StripAllWeapons()
-                player.GiveNamedWeapon("weapon_slappers", 0)
-                player.GiveNamedWeapon("weapon_dd44", 14)  # DD44 starts w/ 10 bullets: 8|16
-                player.SetArmor(int(Glb.GE_MAX_ARMOR))
+            player.StripAllWeapons()
+            player.GiveNamedWeapon("weapon_slappers", 0)
+            player.GiveNamedWeapon("weapon_dd44", 14)  # DD44 starts w/ 10 bullets: 8|16
+            player.SetArmor(int(Glb.GE_MAX_ARMOR))
 
     def lc_OnHackTimer(self, timer, update_type):
         assert isinstance(timer, Timer)
@@ -549,13 +546,18 @@ class LaunchCode(GEScenario):
         else:
             return self.COLOR_RADAR_JANUS
 
-    def lc_ListPlayers(self, team, ignore=None):
+    def lc_ListPlayers(self, team, ignore=None, npcs=False):
         list = []
         for j in range(32):
             if GEPlayer.IsValidPlayerIndex(j):
                 player = GEPlayer.GetMPPlayer(j)
                 if player.GetTeamNumber() == team and player.GetUID() != ignore:
+                    # Favor humans over NPCs
+                    if not npcs and player.IsNPC():
+                        continue
                     list.append(player.GetUID())
+        if len(list) == 0:  # No humans on hacker team, regrab list without stripping NPCs
+            self.lc_ListPlayers(team, ignore, True)
         return list
 
     def lc_HavePlayers(self):
