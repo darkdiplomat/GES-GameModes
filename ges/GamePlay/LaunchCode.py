@@ -100,7 +100,7 @@ class LaunchCode(GEScenario):
         self.timer_hacking = None
         self.game_roundCount = 0
         self.hacker_hasWeapon = False
-        self.hacker_canArm = False
+        self.hacker_canArm = True
         self.game_lastTerminalUID = None
         self.game_currTerminalUID = None
         self.hacker_hasTool = False
@@ -144,7 +144,7 @@ class LaunchCode(GEScenario):
 
     def OnLoadGamePlay(self):
         # Precache our custom items
-        GEUtil.PrecacheModel("models/gameplay/capturepoint.mdl")
+        GEUtil.PrecacheModel("models/props/monitor_multi_set1_dynamic.mdl")
 
         # Clear the timer list
         self.timerTracker.RemoveTimer()
@@ -172,7 +172,7 @@ class LaunchCode(GEScenario):
         # Exclude hacker costumes
         GERules.SetExcludedCharacters("female_scientist, boris")
 
-        GERules.GetTokenMgr().SetupCaptureArea("terminals", model="models/gameplay/capturepoint.mdl",
+        GERules.GetTokenMgr().SetupCaptureArea("terminals", model="models/props/monitor_multi_set1_dynamic.mdl",
                                                limit=4, radius=32, location=Glb.SPAWN_PLAYER)
 
         self.CreateCVar("lc_warmup", "30", "Warmup time before the match begins")
