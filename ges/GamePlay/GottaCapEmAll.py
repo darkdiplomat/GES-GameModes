@@ -46,7 +46,6 @@ class GottaCapEmAll(GEScenario):
         self.pltracker = GEPlayerTracker(self)
         self.warmupTimer = GEWarmUp(self)  # init warm up timer
         self.waitingForPlayers = True
-        self.targetTracker = {}
 
     def GetPrintName(self):
         return "Gotta Cap'em All (BETA)"
@@ -60,14 +59,14 @@ class GottaCapEmAll(GEScenario):
     def GetScenarioHelp(self, help_obj):
         help_obj.SetDescription("You have to kill every other player once to win!\n"
                                 "The first player to kill every other player wins the round.\n"
-                                "You only score points for unique kills. Use !voodoo to see Targets.")
+                                "You only score points for unique kills. Use !voodoo to see Targets.\n"
+                                "Round locks after first kill.")
 
     def OnLoadGamePlay(self):
         GERules.AllowRoundTimer(False)
 
     def OnUnloadGamePlay(self):
         # Clean up
-        self.targetTracker.clear()
         self.pltracker = None
         self.warmupTimer = None
 
@@ -84,9 +83,9 @@ class GottaCapEmAll(GEScenario):
         self.FIRST_KILL = False
 
     def OnRoundEnd(self):
-        self.targetTracker.clear()
         for ply in GetPlayers():  # Clear the target list
-            self.pltracker.SetValueAll(ply.GetUID(), True)
+            # Clears the player's dict
+            self.pltracker.Clear(ply.GetUID()) # is there other data being tracked that we just dumped?
         GERules.UnlockRound()
 
     def OnPlayerConnect(self, player):
@@ -122,7 +121,6 @@ class GottaCapEmAll(GEScenario):
                 if ply.IsInRound():
                     self.pltracker.SetValueAll(ply.GetUID(), False)
                     initPly.append(ply)
-                    self.targetTracker.setdefault(ply.GetUID(), "")
 
         if not self.pltracker[killer].get(victim.GetUID(), False):
             # Capped a new one
