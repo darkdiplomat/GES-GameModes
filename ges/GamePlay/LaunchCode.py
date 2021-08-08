@@ -28,11 +28,6 @@ import random
 USING_API = Glb.API_VERSION_1_2_0
 
 
-# TODO:
-# 	1. Hacker transfer on change team / disconnect
-#
-
-
 def getPlayerFromUID(uid):
     if not uid:
         return None
@@ -106,6 +101,7 @@ class LaunchCode(GEScenario):
         self.hacker_hasTool = False
         self.game_lowPlayers = True
         self.game_lowPlayersNotice = 0
+        self.game_terminal_model = "models/props/bunker/oldlaptop.mdl"
 
         # Hacker Variables
         self.hacker_notice = 0
@@ -144,7 +140,7 @@ class LaunchCode(GEScenario):
 
     def OnLoadGamePlay(self):
         # Precache our custom items
-        GEUtil.PrecacheModel("models/props/monitor_multi_set1_dynamic.mdl")
+        GEUtil.PrecacheModel(self.game_terminal_model)
 
         # Clear the timer list
         self.timerTracker.RemoveTimer()
@@ -172,19 +168,18 @@ class LaunchCode(GEScenario):
         # Exclude hacker costumes
         GERules.SetExcludedCharacters("female_scientist, boris")
 
-        GERules.GetTokenMgr().SetupCaptureArea("terminals", model="models/props/monitor_multi_set1_dynamic.mdl",
-                                               limit=4, radius=32, location=Glb.SPAWN_PLAYER)
+        GERules.GetTokenMgr().SetupCaptureArea("terminals", model=self.game_terminal_model,
+                                                                limit=4, radius=32, location=Glb.SPAWN_PLAYER)
 
         self.CreateCVar("lc_warmup", "30", "Warmup time before the match begins")
-        # TODO: One of those things that seems to have gone unimplemented
-        # self.CreateCVar("lc_hackerboost", "1", "Allow the hacker to gain an ego-boost")
+        self.CreateCVar("lc_hackerboost", "0", "Allow the hacker to gain an ego-boost")
         self.CreateCVar("lc_hackertool", "1", "Allow the Insta-Hack tool")
         self.CreateCVar("lc_hacktime", "15", "Base number of seconds to hack a terminal")
         self.CreateCVar("lc_hackerdefense", "1", "Allows the hacker to have a DD44 to protect themselves")
         self.CreateCVar("lc_debug", "0", "Enabled/Disables debugging prompts")
 
     def OnRoundBegin(self):
-        self.__debug = GEUtil.GetCVarValue("lc_debug")
+        self.__debug = GEUtil.GetCVarValue("lc_debug") == 1
         if self.__debug:
             GEUtil.ClientPrint(None, Glb.HUD_PRINTTALK, self.TAG + "Debugging Enabled")
         else:
@@ -192,7 +187,7 @@ class LaunchCode(GEScenario):
 
         GERules.GetRadar().SetForceRadar(True)
         GERules.ResetAllPlayersScores()
-        self.hacker_canArm = bool(GEUtil.GetCVarValue("lc_hackerdefense"))
+        self.hacker_canArm = GEUtil.GetCVarValue("lc_hackerdefense") == 1
         self.game_roundCount += 1
 
         self.lc_DerobeHacker()
@@ -450,7 +445,7 @@ class LaunchCode(GEScenario):
 
     def lc_CreateHackingTool(self):
         # Only create the hacking tool if allowed
-        if bool(GEUtil.GetCVarValue("lc_hackertool")):
+        if GEUtil.GetCVarValue("lc_hackertool") == 1:
             mgr = GERules.GetTokenMgr()
             mgr.SetupToken(self.TOOL_CLASSNAME, limit=1, location=Glb.SPAWN_AMMO,
                        allow_switch=True, glow_color=GEUtil.CColor(80, 80, 80, 255), glow_dist=500.0)
